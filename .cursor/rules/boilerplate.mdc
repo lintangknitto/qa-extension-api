@@ -1,0 +1,276 @@
+---
+description: Knitto Backend Boilerplate - Aturan development untuk TypeScript REST API
+globs:
+    - '**/*.ts'
+    - '**/*.js'
+alwaysApply: true
+---
+
+# Knitto Backend Boilerplate - Cursor Rules
+
+Anda adalah AI assistant yang membantu development menggunakan Knitto Backend Boilerplate TypeScript. Ikuti aturan berikut dengan ketat.
+
+## 🎯 Prinsip Utama
+
+1. **Selalu ikuti struktur dan konvensi boilerplate ini**
+2. **Gunakan bahasa Indonesia untuk komunikasi**
+3. **Prioritaskan clean code dan maintainability**
+4. **Ikuti domain-driven design pattern**
+
+## 📁 Struktur Project
+
+### Organisasi Folder HTTP
+
+```
+src/app/http/
+├─ [nama-domain]/           # Domain atau modul fitur
+│  └─ [nama-fitur]/         # Fitur spesifik
+│     ├─ [nama-fitur].controller.ts
+│     ├─ [nama-fitur].request.ts
+│     ├─ [nama-fitur].routes.ts
+│     ├─ domain/            # Aturan bisnis (unit test WAJIB)
+│     │   └─ *.domain.ts
+│     ├─ queries/           # SELECT queries
+│     │   └─ *.queries.ts
+│     ├─ repo/              # INSERT/UPDATE/DELETE (optional)
+│     │   └─ *.repo.ts
+│     ├─ use-case/          # Orkestrasi kompleks (optional)
+│     │   └─ *.case.ts
+│     ├─ service/           # External service calls (optional)
+│     │   └─ *.service.ts
+│     ├─ helper/            # Utility tanpa business logic (unit test WAJIB)
+│     │   └─ *.helper.ts
+│     └─ __tests__/
+│        ├─ domain/*.domain.spec.ts
+│        └─ helper/*.helper.spec.ts
+```
+
+### Layer Responsibilities
+
+| Layer          | File                   | Tanggung jawab                                                                                |
+| -------------- | ---------------------- | --------------------------------------------------------------------------------------------- |
+| **Routes**     | `*.routes.ts`          | Export default `Router()` + `requestHandler`, path HTTP, `requestValidator`, handler chain    |
+| **Request**    | `*.request.ts`         | Skema Valibot + tipe keluaran (`InferOutput`)                                                 |
+| **Controller** | `*.controller.ts`      | Baca `req`, auth/session context, panggil queries/use-case/repo, return `{ message, result }` |
+| **Domain**     | `domain/*.domain.ts`   | Aturan bisnis murni, pure functions, tanpa I/O                                                |
+| **Queries**    | `queries/*.queries.ts` | SELECT/get data via `mysqlConnection` atau connection dari repo; tanpa mutasi                 |
+| **Repository** | `repo/*.repo.ts`       | Mutasi DB (INSERT/UPDATE/DELETE), `extends BaseRepository`, per-proses bisnis                 |
+| **Use-Case**   | `use-case/*.case.ts`   | Orkestrasi kompleks, **ctx style** `{ req, ... }`, tanpa try-catch                            |
+| **Service**    | `service/*.service.ts` | Integrasi ke layanan eksternal (external API, third-party)                                    |
+| **Helper**     | `helper/*.helper.ts`   | Utility tanpa business logic                                                                  |
+
+**Query vs repo:** SELECT di `queries/`. Mutasi di `repo/`. Aturan bisnis di `domain/` + orkestrasi di `use-case/`.
+
+**Controller:** Simple flow → query langsung. Complex flow → use-case. Tidak ada business logic kompleks.
+
+**Use-Case (jika dipakai):** WAJIB ctx style dengan `req` object. Contoh: `{ req, userId, data }`. TIDAK WAJIB untuk flow sederhana. **DILARANG** signature posisional `(tx, ...args)`.
+
+**Repository:** DISARANKAN extend `BaseRepository` dari `@/libs/helpers/BaseRepository`. Satu repo = satu proses bisnis (bukan per-tabel). Support transaction via constructor.
+
+### Shared vs Libs
+
+- **src/shared/** — Business logic reusable antar domain
+- **src/libs/helpers/** — Utility general (formatDate, dll.)
+- **src/libs/config/** — mysqlConnection, errorMessage, guestPathHttp
+- **src/libs/middlewares/** — authorization, basicPaginate, idempotency
+- **src/libs/types/** — Global type definitions (`.d.ts`)
+
+## 🔤 Konvensi Penamaan
+
+- **SELALU** `kebab-case` untuk file/folder
+- Pattern: `[nama-fitur].controller.ts`, `queries/*.queries.ts`, `repo/*.repo.ts`, `use-case/*.case.ts`
+- Migration Product Backlog: `PB-x.x.x.sql`
+- Migration Production Issue: `YYYYMMDDHHmmss.sql`
+
+## 📝 Template & Referensi Library
+
+Detail API library — **baca README package** (sumber kebenaran); rule tipis hanya konvensi proyek:
+
+| Topik                                            | README (API)                                                | Rule (konvensi proyek)                            |
+| ------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------- |
+| HTTP                                             | `node_modules/@knittotextile/knitto-http/README.md`         | `knitto-http.mdc`                                 |
+| Logger, exception, utility                       | `node_modules/@knittotextile/knitto-core-backend/README.md` | `knitto-core-backend.mdc`                         |
+| RabbitMQ                                         | `node_modules/@knittotextile/knitto-rabbitmq/README.md`     | `knitto-rabbitmq.mdc`                             |
+| Workflow agent (fitur, debug, refactor, upgrade) | —                                                           | [`.cursor/skills/README.md`](../skills/README.md) |
+
+### Pola Inti — pointer ke snippet
+
+Rules mendefinisikan **kontrak**; contoh kode lengkap ada di skill **`feature-scaffold`** → folder `examples/`.
+
+| Pola                                | Kontrak                                                        | Snippet                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Routes**                          | Export default `Router()` + `requestHandler` / `requestValidator` | `examples/routes.snippet.md`                                                            |
+| **Controller**                      | `TRequestFunction`, return `{ message, result }`               | `examples/controller.snippet.md`                                                           |
+| **Use-case**                        | ctx `{ req, ... }`, file `use-case/*.case.ts`, tanpa try-catch | `examples/case.snippet.md`                                                                 |
+| **Repository**                      | `extends BaseRepository`, mutasi via `this.getConnection()`    | `examples/repository.snippet.md`                                                           |
+| **Transaksi**                       | START/COMMIT/ROLLBACK di controller; try-catch hanya di sini   | `examples/controller.snippet.md` (§ multi-repo)                                            |
+| **Request / Query / Domain / Test** | Valibot, SELECT, aturan bisnis, unit test                      | `examples/request.snippet.md`, `query.snippet.md`, `domain.snippet.md`, `tests.snippet.md` |
+
+API HTTP lengkap (pagination, file upload, middleware): baca **`node_modules/@knittotextile/knitto-http/README.md`**.
+
+## 🎯 Decision Guide & Workflow Fitur Baru
+
+### Kapan pakai layer apa?
+
+| Layer                   | BUAT jika                                           | JANGAN buat jika                           |
+| ----------------------- | --------------------------------------------------- | ------------------------------------------ |
+| **Domain**              | Aturan bisnis, transformasi, kalkulasi pure         | Hanya format sederhana (pakai helper)      |
+| **Queries**             | SELECT reusable / perlu di-mock                     | SELECT 1x sederhana (inline di controller) |
+| **Repository**          | INSERT/UPDATE/DELETE, multi-table mutasi, transaksi | Hanya SELECT; query 1x sederhana           |
+| **Use-Case**            | Flow kompleks, koordinasi multi-layer               | Single query / 1-2 panggilan sederhana     |
+| **Service**             | External API / third-party                          | Tidak ada external call                    |
+| **Helper**              | Utility tanpa business logic                        | Ada business rules (pakai domain)          |
+| **Controller langsung** | Simple read / single operation                      | Orchestration rumit (pakai use-case)       |
+| **shared/**             | Logic dipakai multi-domain                          | Utility general (pakai libs/helpers/)      |
+
+### Kompleksitas & struktur file
+
+- **Simple:** controller + routes + request (query inline di controller)
+- **Medium:** + queries/ + domain/ (+ unit test domain)
+- **Complex:** + repo/ + use-case/ (+ unit test domain/helper)
+- **Very Complex:** + service/ + helper/
+
+### Langkah implementasi
+
+1. Buat folder kebab-case
+2. `request.ts` → `controller.ts` → `routes.ts`
+3. Tambah `queries/`, `domain/`, `repo/`, `use-case/`, `service/`, `helper/` sesuai tabel di atas
+4. Unit test WAJIB untuk domain dan helper di `__tests__/`
+5. Routes terdaftar otomatis via auto-routing `src/app/http/` (kecuali folder dikecualikan)
+
+## 📦 Package & Import
+
+```typescript
+// HTTP
+import { Router, requestHandler, TRequestFunction, requestValidator } from '@knittotextile/knitto-http';
+
+// Core
+import {
+	GeneralException,
+	InvalidParameterException,
+	NotFoundException
+} from '@knittotextile/knitto-core-backend';
+
+// Validation
+import { object, string, number, InferOutput } from 'valibot';
+
+// Repository
+import BaseRepository from '@/libs/helpers/BaseRepository';
+import mysqlConnection from '@/libs/config/mysqlConnection';
+```
+
+**Module alias:** `@` → `./src/`, `@http` → `./src/app/http/`, `@libs` → `./src/libs/`
+
+**SELALU** gunakan alias — jangan relative path panjang.
+
+## 🛠️ Error Handling
+
+### TIDAK BOLEH try-catch di layer bisnis
+
+Layer berikut **wajib throw error langsung** — tanpa try-catch:
+
+- use-case, domain, helper, queries, repo
+
+Error handling terpusat di `requestHandler` middleware (`@knittotextile/knitto-http`). Try-catch di layer bisnis mengganggu retry dan format error konsisten.
+
+**Pengecualian:** orchestration transaksi DB di controller (START TRANSACTION / COMMIT / ROLLBACK).
+
+```typescript
+// ✅ GOOD
+export const getUserById = async (userId: string) => {
+	const user = await queries.getUserById(userId);
+	if (!user) throw new NotFoundException('User tidak ditemukan', { userId });
+	return user;
+};
+
+// ❌ BAD — try-catch di queries/domain/repo/use-case/helper
+```
+
+### Exception classes
+
+| Situasi                   | Class                       |
+| ------------------------- | --------------------------- |
+| Parameter tidak valid     | `InvalidParameterException` |
+| Data tidak ditemukan      | `NotFoundException`         |
+| Akses ditolak             | `NotAuthorizationException` |
+| Request dibatalkan client | `RequestAbortedByClient`    |
+| Error lain                | `GeneralException`          |
+
+Detail logger dan `singleFlight`: baca **`node_modules/@knittotextile/knitto-core-backend/README.md`**.
+
+## 🚫 Aturan Ketat
+
+### DILARANG
+
+1. Helper di `shared/` (gunakan `libs/helpers/`)
+2. Business logic kompleks di controller
+3. camelCase/PascalCase untuk file/folder
+4. Use-case untuk flow sederhana
+5. Repo untuk SELECT (taruh di queries/)
+6. Repository per-tabel (harus per-proses bisnis)
+7. Import relative path panjang
+8. Folder `controllers/`, `services/`, `repositories/` terpisah
+9. CTE dan `ROW_NUMBER()` dalam query SQL
+10. Try-catch di use-case, domain, helper, queries, repo
+11. Use-case tanpa `req` di ctx / multiple parameters posisional
+12. Penamaan `*.use-case.ts` — pakai `*.case.ts` di folder `use-case/`
+13. Operasi git destructive tanpa konfirmasi
+
+### WAJIB
+
+1. kebab-case untuk semua file/folder
+2. Domain-driven structure
+3. Valibot untuk validasi input
+4. Module alias (`@/`, `@http/`, `@libs/`)
+5. SELECT di queries/ atau controller; mutasi di repo/
+6. Export default instance `Router()` dari `@knittotextile/knitto-http` (auto-routing)
+7. Unit test domain + helper di `__tests__/`
+8. Use-case ctx style: `{ req, ... }`
+
+## 🌐 Domain Organization
+
+Kelompokkan by **business domain**, bukan technical layer:
+
+```
+pemartaian-chemical/
+├─ pemartaian-pallet-kosong/
+├─ penyimpanan-kontainer/
+└─ penyimpanan-pallet-ke-area-mesin/
+```
+
+## 📚 Code Style & Best Practices
+
+- `async/await`, arrow functions untuk exports
+- TypeScript strict, meaningful names, fungsi kecil
+- Validasi semua input user
+- Optimize queries, hindari N+1
+- Repository: export class (bukan instance), `this.getConnection()` untuk DB
+
+## 📖 Referensi
+
+- Repository pattern: https://github.com/knittotextile/kat-rest-mobile-operations
+- Agent skills (fitur, debug, refactor, upgrade): `.cursor/skills/README.md`
+- Custom subagents (`knitto-agent-*`): `.cursor/agents/README.md`
+- Orchestrator strict (delegasi root): `.cursor/rules/orchestrator.mdc`
+- Slash commands: `.cursor/commands/` (`/feature`, `/fix`, `/refactor`, `/upgrade`)
+- Server CLI dev pipeline: `.cursor/automation/README.md`
+- **Panduan workflow PB (cheat sheet):** `PANDUAN-WORKFLOW.md` (root project)
+
+## 📋 Prerequisites
+
+- **Node.js** 24.18.0 (exact patch — `.nvmrc` / `.node-version`, `engines` + `engine-strict=true` di `.npmrc`, plus `preinstall` → `scripts/check-engines.mjs`)
+- **pnpm** 11.17.0 (`packageManager` di `package.json` + Corepack)
+
+## ⚡ Quick Commands
+
+```bash
+pnpm dev         # Development (Node 24.18.0 + pnpm 11.17.0)
+pnpm build       # Build
+pnpm test        # Test
+pnpm lint        # Lint
+pnpm type-check  # TypeScript tanpa emit
+```
+
+---
+
+**INGAT**: Selalu tanyakan jika ada yang tidak jelas. Better ask than implement wrong pattern!

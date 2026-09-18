@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build output
+dist/
+coverage/
+
+# Database
+database/
+
+# Storage
+storage/
+
+# Tests
+tests/
+
+# Config
+.husky/
+.github/
+
+# Logs
+*.log

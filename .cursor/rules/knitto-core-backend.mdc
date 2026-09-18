@@ -1,0 +1,44 @@
+---
+description: Knitto Core Backend — konvensi proyek (API detail di README package)
+globs:
+  - 'src/**'
+alwaysApply: false
+---
+
+# @knittotextile/knitto-core-backend
+
+## Sumber kebenaran API
+
+**WAJIB baca** sebelum pakai logger, exception, atau utility:
+
+- `node_modules/@knittotextile/knitto-core-backend/README.md`
+- Repo: https://github.com/knittotextile/knitto-core-backend
+
+Jangan mengandalkan duplikasi API di rule ini. Detail `logger`, `createLogger`, `setLogger`, `dump`, `singleFlight`, `moduleImporter` — ada di README.
+
+## Pemetaan exception (ringkas)
+
+| Situasi | Class |
+|---------|-------|
+| Parameter tidak valid | `InvalidParameterException` |
+| Data tidak ditemukan | `NotFoundException` |
+| Akses ditolak | `NotAuthorizationException` |
+| Request dibatalkan client | `RequestAbortedByClient` |
+| Error lain | `GeneralException` |
+
+Selalu sertakan **context object** di exception. Jangan `throw new Error(...)`.
+
+## Konvensi proyek
+
+| Topik | Standar |
+|-------|---------|
+| Logging | Structured: `logger.info({ ...context }, 'pesan')` — bukan string saja |
+| Error display dev | `dump(error)` — lihat entry [`src/index.ts`](src/index.ts) |
+| Layer bisnis | **Tanpa try-catch** di domain, queries, repo, use-case, helper — lihat [`boilerplate.mdc`](boilerplate.mdc) |
+| `singleFlight` | Hanya operasi mahal (DB/API), bukan operasi trivial |
+
+## Larangan proyek
+
+- Generic `Error` tanpa mapping exception class
+- `logger.info('pesan saja')` tanpa context object
+- Catch error di layer bisnis tanpa re-throw (error handling terpusat di HTTP middleware)

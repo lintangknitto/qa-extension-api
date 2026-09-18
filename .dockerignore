@@ -1,0 +1,15 @@
+node_modules
+.git
+.gitignore
+*.md
+dist
+
+.cursor
+.github
+.husky
+covergae
+database
+docs
+migrations
+
+tests

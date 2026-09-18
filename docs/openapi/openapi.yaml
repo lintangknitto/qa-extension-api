@@ -1,0 +1,170 @@
+openapi: 3.0.3
+info:
+  title: knitto-backend-boilerplate-ts
+  version: 0.0.0
+  description: Kontrak HTTP Knitto REST boilerplate (maintained manual; sync saat ubah API).
+servers:
+  - url: /
+    description: Host/port sama dengan Scalar API Reference (browser saat ini)
+tags:
+  - name: home
+    description: Modul umum dan healthcheck (`src/app/http/home`).
+  - name: auth
+    description: Login, logout, dan autentikasi JWT (`src/app/http/auth`).
+x-tagGroups:
+  - name: Umum
+    tags:
+      - home
+  - name: Autentikasi
+    tags:
+      - auth
+paths:
+  /:
+    get:
+      tags:
+        - home
+      summary: Informasi aplikasi dan healthcheck
+      operationId: getHome
+      responses:
+        '200':
+          description: Sukses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnittoSuccessEnvelope'
+              example:
+                message: Success
+                result:
+                  APP_NAME: knitto-backend-boilerplate-ts
+                  APP_VERSION: 0.0.0
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Login
+      description: Autentikasi pengguna dengan username dan password.
+      operationId: postAuthLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: diki
+              password: dmain
+      responses:
+        '200':
+          description: Sukses
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/KnittoSuccessEnvelope'
+                  - type: object
+                    properties:
+                      result:
+                        $ref: '#/components/schemas/LoginResult'
+              example:
+                message: Success
+                result:
+                  user:
+                    id_user: 269
+                    nama: Diki IT
+                    username: diki
+                    input: disable
+                  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example
+        '400':
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnittoErrorEnvelope'
+              example:
+                message: Username dan Password harus berupa string
+                result: {}
+  /auth/logout:
+    get:
+      tags:
+        - auth
+      summary: Logout
+      description: Mengakhiri sesi pengguna (token JWT).
+      operationId: getAuthLogout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sukses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnittoSuccessEnvelope'
+              example:
+                message: Success
+                result: {}
+        '401':
+          description: Tidak terautentikasi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnittoErrorEnvelope'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    KnittoSuccessEnvelope:
+      type: object
+      required:
+        - message
+        - result
+      properties:
+        message:
+          type: string
+          example: Success
+        result:
+          type: object
+          nullable: true
+    KnittoErrorEnvelope:
+      type: object
+      required:
+        - message
+        - result
+      properties:
+        message:
+          type: string
+        result:
+          type: object
+          nullable: true
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Nama pengguna
+        password:
+          type: string
+          format: password
+          description: Kata sandi
+    LoginResult:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id_user:
+              type: integer
+            nama:
+              type: string
+            username:
+              type: string
+            input:
+              type: string
+        token:
+          type: string
+          description: JWT access token

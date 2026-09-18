@@ -1,0 +1,42 @@
+---
+description: Knitto HTTP — konvensi proyek (API detail di README package)
+globs:
+  - 'src/app/http/**'
+  - '**/http/**'
+alwaysApply: false
+---
+
+# @knittotextile/knitto-http
+
+## Sumber kebenaran API
+
+**WAJIB baca** sebelum implementasi HTTP:
+
+- `node_modules/@knittotextile/knitto-http/README.md`
+- Repo: https://github.com/knittotextile/knitto-http
+
+Jangan mengandalkan duplikasi API di rule ini. Detail `ExpressServer`, `requestHandler`, `requestValidator`, `sendResponse`, `basicValidationMessage`, pagination, CORS, middleware — semua ada di README.
+
+## Entry point proyek ini
+
+- Server: [`src/app/http/index.ts`](src/app/http/index.ts) — `ExpressServer`, auto-load routes dari folder ini
+- Auth global: `authMiddleware`; bypass path → [`src/libs/config/guestPathHttp.ts`](src/libs/config/guestPathHttp.ts)
+- **Dokumentasi API (Scalar):** file OpenAPI [`docs/openapi/openapi.yaml`](../../../docs/openapi/openapi.yaml) — bukan JSDoc/`express-jsdoc-swagger`. Aktif jika `OPENAPI_DOCS_ENABLED=true` → Scalar di `/api-docs` (sidebar, `x-tagGroups`), spec di `/api-docs/openapi.yaml`. Sync manual: skill [`openapi-manual-sync`](../../skills/openapi-manual-sync/SKILL.md).
+
+## Konvensi proyek (tidak ada di README package)
+
+Arsitektur layering: [`boilerplate.mdc`](boilerplate.mdc). Snippet scaffold: skill `feature-scaffold/examples/`.
+
+| Topik | Standar proyek |
+|-------|----------------|
+| Routes | File `*.routes.ts`, export **default** instance **`Router()`** + `requestHandler` / `requestValidator` (auto-routing) |
+| Validator | `requestValidator({ type: Schema, requestType: 'body' \| 'query' })` |
+| Controller JSON | `TRequestFunction`, return `{ message, result, statusCode? }` |
+| Error | Throw exception dari `@knittotextile/knitto-core-backend` — ditangani `requestHandler` |
+| Validasi pesan | `basicValidationMessage` + bahasa Indonesia (lihat README § basicValidationMessage) |
+
+## Larangan proyek
+
+- `Router` dari `express` langsung — impor `Router` dari `@knittotextile/knitto-http`
+- `res.json()` manual di controller JSON (pakai return `TRequestFunction`)
+- Validasi manual di controller jika sudah ada skema di `*.request.ts`

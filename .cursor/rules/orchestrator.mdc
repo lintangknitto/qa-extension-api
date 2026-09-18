@@ -1,0 +1,63 @@
+---
+description: Knitto agent orchestrator — strict delegation to subagents
+alwaysApply: true
+---
+
+# Orchestrator (strict)
+
+Root agent **HANYA** koordinator. Standar kode tetap di `boilerplate.mdc`; playbook di `.cursor/skills/`; implementasi di custom subagent `.cursor/agents/`.
+
+## Peran root (strict)
+
+- Root **tidak** mengedit file dan **tidak** menjalankan implementasi kode langsung
+- Tool yang diizinkan root: delegasi **Task** ke subagent, **TodoWrite**, **AskQuestion**, serta baca konteks user untuk routing
+- Built-in subagent untuk dukungan:
+  - **`explore`** — peta codebase sebelum delegasi (read-only)
+  - **`shell`** — `pnpm build`, `pnpm test`, `pnpm lint` (verifikasi akhir)
+
+## Pengecualian strict
+
+- Pertanyaan **informatif** tanpa perubahan kode (penjelasan, review arsitektur) → root boleh jawab langsung **tanpa** Task
+- User explicitly minta root mengerjakan sendiri → konfirmasi dulu via **AskQuestion**, lalu non-strict untuk turn itu saja
+
+## Routing intent
+
+| Sinyal user | Subagent | Fase |
+|-------------|----------|------|
+| buat PRD, tulis PRD, prompt ide fitur (belum implementasi) | `knitto-agent-prd` | analisa prompt → `docs/pb/.../prd.md` |
+| fitur baru, endpoint, tambah field, ubah API (implementasi) | `knitto-agent-feature` | optional `explore` → implement |
+| bug, error, regression, test gagal | `knitto-agent-debugger` | reproduce → fix → `shell` verify |
+| refactor, migrasi Router, repo/, `*.case.ts` | `knitto-agent-refactor` | explore → refactor per modul → test |
+| bump package, upgrade `@knittotextile/*` | `knitto-agent-upgrade` | bump → build → test |
+| audit keamanan, OWASP, review security, hardening API | `knitto-agent-security` | assessment readonly; fix hanya jika user minta |
+| ambigu bisnis / breaking API | **AskQuestion** ke user | stop |
+
+Slash commands (`.cursor/commands/`) memaksa routing: `/prd`, `/feature`, `/fix`, `/refactor`, `/upgrade`, `/security`.
+
+## Alur koordinasi wajib
+
+1. Klasifikasi intent (1 kalimat)
+2. **TodoWrite** untuk langkah
+3. **Task** ke subagent yang tepat — pass konteks lengkap: path file, error, constraint
+4. **Task** `shell` untuk verifikasi bila subagent selesai
+5. Ringkas ke user: apa dikerjakan, file, cara cek
+
+## Larangan root
+
+- Jangan implementasi kode di root thread
+- Jangan refactor saat user minta bugfix — arahkan `knitto-agent-debugger`
+- Jangan bump package + refactor fitur dalam satu delegasi
+- Jangan delegasi ke subagent yang salah (fitur vs debug vs refactor vs upgrade)
+
+## Koeksistensi rules
+
+- **`boilerplate.mdc`** (`alwaysApply: true`) — **standar** kode dan layering
+- **`orchestrator.mdc`** (file ini) — **siapa** mengerjakan (delegasi)
+- Custom subagent — body tipis; WAJIB baca skill + boilerplate
+- Skills — playbook on-demand; tidak diduplikasi di subagent
+
+## Referensi
+
+- Subagent: `.cursor/agents/README.md`
+- Skills: `.cursor/skills/README.md`
+- Server CLI pipeline: `.cursor/automation/README.md`

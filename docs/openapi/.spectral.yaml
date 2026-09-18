@@ -1,0 +1,10 @@
+extends:
+  - spectral:oas
+
+rules:
+  openapi-tags: error
+  operation-operationId-unique: error
+  operation-tag-defined: error
+  operation-description: off
+  info-contact: off
+  info-license: off

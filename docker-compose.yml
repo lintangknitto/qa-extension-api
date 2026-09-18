@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  build:
+    image: knitto_boiler_plate
+    restart: always
+    volumes:
+      - ./storage:/app/storage
+    working_dir: /app
+    ports:
+      - ${APP_PORT_HTTP}:8000
+    environment:
+     - NODE_ENV=${NODE_ENV}
+     - APP_SECRET_KEY=${APP_SECRET_KEY}
+     - DB_HOST_MYSQL=${DB_HOST_MYSQL}
+     - DB_NAME_MYSQL=${DB_NAME_MYSQL}
+     - DB_USER_MYSQL=${DB_USER_MYSQL}
+     - DB_PASS_MYSQL=${DB_PASS_MYSQL}
+     - DB_PORT_MYSQL=${DB_PORT_MYSQL}
+     - RABBITMQ_URL=${RABBITMQ_URL}
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.10.1.0/24
+          gateway: 172.10.1.1

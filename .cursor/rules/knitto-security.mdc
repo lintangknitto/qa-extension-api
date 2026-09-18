@@ -1,0 +1,49 @@
+---
+description: Kontrak keamanan minimal OWASP untuk HTTP, middleware, config, service
+globs:
+  - 'src/app/http/**'
+  - 'src/libs/middlewares/**'
+  - 'src/libs/config/**'
+  - 'src/**/service/**'
+alwaysApply: false
+---
+
+# Keamanan API (kontrak tipis)
+
+Playbook lengkap dan checklist OWASP: skill [`security-owasp-minimal`](../../skills/security-owasp-minimal/SKILL.md). Rule ini hanya kontrak proyek — jangan duplikasi skill.
+
+## Auth & guest path
+
+- JWT global via middleware; bypass **hanya** lewat [`src/libs/config/guestPathHttp.ts`](src/libs/config/guestPathHttp.ts)
+- Jangan bypass auth ad hoc di route/controller
+- `withSubPath: true` hanya bila benar-benar perlu — review luasnya path
+
+## Input & SQL
+
+- Validasi input: Valibot di `*.request.ts` + `requestValidator` di routes
+- Query/mutasi DB: parameterized (`?` + array params via `mysqlConnection` / repo) — **dilarang** concat string dari input user
+
+## Secret & logging
+
+- Secret hanya dari env (`.env` / deployment) — jangan hardcode di kode
+- Jangan log token, password, atau body sensitif
+
+## Response & error
+
+- Envelope `{ message, result }`
+- Redaksi stack trace / detail internal DB di response client **opsional** — **audience** (publik/eksternal vs internal-only) ditetapkan **tingkat repository**, bukan ad hoc per endpoint tanpa konteks repo:
+  - Tim mendokumentasikan di PRD, `api-design.md` (§ Keamanan), atau kebijakan repo — **satu repo = satu posture default**
+  - Endpoint campuran (sebagian publik, sebagian internal) harus **eksplisit** di `api-design.md`, bukan asumsi per handler
+  - **Publik / eksternal (posture repo):** hindari stack/detail internal di `{ message, result }`; jangan tambahkan kebocoran manual di controller
+  - **Internal-only (posture repo):** boleh mengandalkan perilaku default knitto-http (stack untuk tracing) — hardening tidak wajib
+- Throw exception knitto-core-backend; penanganan terpusat di `requestHandler`
+
+## External HTTP
+
+- Panggilan keluar hanya di `service/*.service.ts`
+- URL/host dari input user: validasi/batasi (SSRF)
+
+## Docs & konfigurasi prod
+
+- `OPENAPI_DOCS_ENABLED` default off — lihat [`.env.example`](../../.env.example)
+- Guest path dan OpenAPI selaras kontrak yang dipublish

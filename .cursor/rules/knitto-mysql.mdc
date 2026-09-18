@@ -1,0 +1,40 @@
+---
+description: Knitto MySQL — konvensi proyek (API detail di README package)
+globs:
+  - '**/queries/**'
+  - '**/repo/**'
+alwaysApply: false
+---
+
+# @knittotextile/knitto-mysql
+
+## Sumber kebenaran API
+
+**WAJIB baca** sebelum menulis query atau mutasi DB:
+
+- `node_modules/@knittotextile/knitto-mysql/README.md`
+- Repo: https://github.com/knittotextile/knitto-mysql
+
+Connection proyek: [`src/libs/config/mysqlConnection.ts`](../../src/libs/config/mysqlConnection.ts) (atau path setara di `src/libs/config/`).
+
+## Layering proyek
+
+| Layer | Tanggung jawab |
+|-------|----------------|
+| **`queries/*.queries.ts`** | SELECT saja — tanpa INSERT/UPDATE/DELETE |
+| **`repo/*.repo.ts`** | Mutasi DB — `extends BaseRepository`, per proses bisnis |
+
+Aturan lengkap: [`boilerplate.mdc`](boilerplate.mdc). Snippet: skill `feature-scaffold/examples/` (`query.snippet.md`, `repository.snippet.md`).
+
+## Migration schema
+
+File SQL di folder [`database/`](../../../database/) — **apply manual**; tidak ada runner otomatis di repo.
+
+Playbook: skill [`db-migration`](../../skills/db-migration/SKILL.md).
+
+## Larangan proyek
+
+- SELECT di `repo/` (pakai `queries/`)
+- Repository per-tabel (satu repo = satu proses bisnis)
+- CTE dan `ROW_NUMBER()` dalam SQL
+- Try-catch di queries/repo (throw ke `requestHandler`)

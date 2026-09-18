@@ -1,0 +1,57 @@
+---
+description: Knitto RabbitMQ — konvensi proyek (API detail di README package)
+globs:
+  - 'src/app/messageBroker/**'
+  - '**/rabbitConnection.ts'
+alwaysApply: false
+---
+
+# @knittotextile/knitto-rabbitmq
+
+## Sumber kebenaran API
+
+**WAJIB baca** sebelum publish/subscribe:
+
+- `node_modules/@knittotextile/knitto-rabbitmq/README.md`
+- Repo: https://github.com/knittotextile/knitto-rabbitmq
+
+Jangan duplikasi API di rule ini. `init`, `publishMessage`, `subscribe`, `createConsumer` — ada di README.
+
+## Entry point proyek ini
+
+| File | Peran |
+|------|-------|
+| [`src/libs/config/rabbitConnection.ts`](src/libs/config/rabbitConnection.ts) | Singleton — import dari sini |
+| [`src/index.ts`](src/index.ts) | `await rabbitConnection.init()` sebelum app start |
+| [`src/app/messageBroker/index.ts`](src/app/messageBroker/index.ts) | `subscribe()` ke `./consumers` |
+| `src/app/messageBroker/publishers/` | `publishMessage` |
+| `src/app/messageBroker/consumers/<domain>/` | `*.consumer.ts`, `*.handler.ts`, `*.request.ts` |
+
+Env: `rabbitMQConfig` di [`src/libs/config`](src/libs/config).
+
+## Konvensi proyek (tidak ada di README package)
+
+Arsitektur consumer: [`boilerplate.mdc`](boilerplate.mdc). Playbook + snippet: skill [`knitto-rabbitmq-consumer`](../skills/knitto-rabbitmq-consumer/SKILL.md) → `examples/`.
+
+| Topik | Standar proyek |
+|-------|----------------|
+| Connection | Satu `rabbitConnection` — jangan `new KnittoRabbitMQ()` di file lain |
+| Consumer | `createConsumer()` + `consumer.add('route', handler)`; **export default** |
+| Layering | `*.consumer.ts` tipis; logic di `*.handler.ts`; Valibot di `*.request.ts` |
+| Subscribe | `subscribe('./consumers', { pattern: '**/*.consumer.ts' })` |
+| Route | Satu string per `add()`; wildcard `*` / `#` didukung |
+| Error consumer | Throw agar retry/DLQ jalan — jangan catch tanpa re-throw |
+| Error publisher | Log + re-throw (`publishers/*.publisher.ts`) |
+| Naming | Folder/file `kebab-case`; suffix `.consumer.ts`, `.handler.ts`, `.request.ts` |
+
+## Retry & DLQ
+
+Quorum queue + `x-delivery-limit`; handler gagal → broker retry → limit habis → `{queue}.dlq` via `{exchangeName}.dlq`.
+
+## Larangan proyek
+
+- Instance RabbitMQ baru per file/handler
+- Subscribe tanpa `init()`
+- Business logic / SQL di `*.consumer.ts`
+- Try-catch di `*.handler.ts` (lihat boilerplate)
+- `process.exit` tanpa `shutdown()` pada SIGTERM/SIGINT (production — lihat README)

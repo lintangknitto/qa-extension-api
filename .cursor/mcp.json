@@ -1,0 +1,9 @@
+{
+	"mcpServers": {
+		"MySQL Database": {
+			"command": "npx",
+			"args": ["-y", "@knittotextile/knitto-mcp-mysql@latest"],
+			"envFile": "${workspaceFolder}/.cursor/env/mysql.env"
+		}
+	}
+}
