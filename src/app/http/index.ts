@@ -1,6 +1,7 @@
 import { logger, dump } from '@knittotextile/knitto-core-backend';
 import { createHttpServer, startHttpServer } from '@knittotextile/knitto-http';
-import { APP_PORT_HTTP, OPENAPI_DOCS_ENABLED } from '@/libs/config';
+import { APP_PORT_HTTP, OPENAPI_DOCS_ENABLED, RECORDING_FEATURE_ENABLED } from '@/libs/config';
+import { initSocketIO } from '@/app/ws';
 import { registerOpenApiDocs } from '@/libs/config/register-open-api-docs';
 import path from 'path';
 import authorizeMiddleware from '@/libs/middlewares/authorization.middleware';
@@ -31,6 +32,9 @@ async function httpServer(): Promise<void> {
 		if (OPENAPI_DOCS_ENABLED) {
 			await registerOpenApiDocs(server);
 		}
+
+		// Socket.IO hanya diaktifkan saat fitur recording menyala.
+		if (RECORDING_FEATURE_ENABLED) initSocketIO(server.httpServer);
 
 		gracefulShutdown.setServer(server.httpServer);
 

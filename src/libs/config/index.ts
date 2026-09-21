@@ -22,3 +22,51 @@ export const rabbitMQConfig = {
 	URL: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
 	EXCHANGE: process.env.RABBITMQ_EXCHANGE || 'noExchange'
 };
+
+/**
+ * Fitur test session recorder bersifat opt-in supaya deployment lama tidak
+ * ikut gagal saat konfigurasi AI/MinIO belum tersedia.
+ */
+export const RECORDING_FEATURE_ENABLED = process.env.RECORDING_FEATURE_ENABLED === 'true';
+
+export const openAiConfig = {
+	API_KEY: process.env.OPENAI_API_KEY || '',
+	BASE_URL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+	MODEL: process.env.OPENAI_MODEL || '',
+	TIMEOUT_MS: Number(process.env.OPENAI_TIMEOUT_MS || 60000),
+	MAX_OUTPUT_TOKENS: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 4000)
+};
+
+export const minioConfig = {
+	ENDPOINT: process.env.MINIO_ENDPOINT || '',
+	PORT: Number(process.env.MINIO_PORT || 9000),
+	USE_SSL: process.env.MINIO_USE_SSL === 'true',
+	REGION: process.env.MINIO_REGION || 'us-east-1',
+	ACCESS_KEY: process.env.MINIO_ACCESS_KEY || '',
+	SECRET_KEY: process.env.MINIO_SECRET_KEY || '',
+	BUCKET: process.env.MINIO_BUCKET || 'qa-recording-artifacts'
+};
+
+const csv = (value: string | undefined, fallback: string): string[] =>
+	(value ?? fallback)
+		.split(',')
+		.map((item) => item.trim())
+		.filter(Boolean);
+
+export const recordingConfig = {
+	UPLOAD_MAX_BYTES: Number(process.env.RECORDING_UPLOAD_MAX_BYTES || 10 * 1024 * 1024),
+	PRESIGN_EXPIRY_SECONDS: Number(process.env.RECORDING_PRESIGN_EXPIRY_SECONDS || 900),
+	NETWORK_BODY_MAX_BYTES: Number(process.env.RECORDING_NETWORK_BODY_MAX_BYTES || 256 * 1024),
+	ARTIFACT_CONTENT_TYPES: csv(
+		process.env.RECORDING_ARTIFACT_CONTENT_TYPES,
+		'image/png,image/jpeg,image/webp,application/json,text/plain'
+	)
+};
+
+/**
+ * Level user yang boleh mengelola master project. Dibuat konfigurabel karena
+ * daftar level dapat berbeda antar deployment.
+ */
+export const PROJECT_ADMIN_LEVELS = csv(process.env.PROJECT_ADMIN_LEVELS, 'ADMIN,QA,SUPERADMIN').map(
+	(level) => level.toUpperCase()
+);

@@ -21,6 +21,11 @@ const guestPath: IGuestPathCfg[] = [
 		method: []
 	},
 	{
+		path: '/knitto-socket',
+		withSubPath: true,
+		method: []
+	},
+	{
 		path: '/api-docs',
 		withSubPath: true,
 		method: []
