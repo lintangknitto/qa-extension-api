@@ -34,6 +34,7 @@ describe('auth.domain', () => {
 				id_user: 1,
 				nama: 'Test User',
 				username: 'testuser',
+				level: 'IMPLEMENTOR',
 				input: 'enable'
 			});
 		});

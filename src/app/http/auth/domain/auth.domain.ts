@@ -12,6 +12,7 @@ export const transformUserResponse = (user: Entity.IUser) => ({
 	id_user: user.id_user,
 	nama: user.nama,
 	username: user.username,
+	level: user.level,
 	input: user.level === 'IMPLEMENTOR' ? 'enable' : 'disable'
 });
 
