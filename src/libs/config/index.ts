@@ -67,6 +67,7 @@ export const recordingConfig = {
  * Level user yang boleh mengelola master project. Dibuat konfigurabel karena
  * daftar level dapat berbeda antar deployment.
  */
-export const PROJECT_ADMIN_LEVELS = csv(process.env.PROJECT_ADMIN_LEVELS, 'ADMIN,QA,SUPERADMIN').map(
-	(level) => level.toUpperCase()
-);
+export const PROJECT_ADMIN_LEVELS = csv(
+	process.env.PROJECT_ADMIN_LEVELS,
+	'ADMIN,QA,SUPERADMIN,IMPLEMENTOR'
+).map((level) => level.toUpperCase());
