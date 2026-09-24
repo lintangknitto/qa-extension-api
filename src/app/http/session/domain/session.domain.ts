@@ -56,6 +56,7 @@ export const toSessionResponse = (session: Entity.IQaRecordingSession) => {
 	return {
 		id_session: value(session.id_session),
 		id_project: value(session.id_project),
+		id_test_case: value(session.id_test_case),
 		test_case_no: value(session.test_case_no),
 		title: value(session.title),
 		description: value(session.description),

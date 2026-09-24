@@ -9,9 +9,11 @@ export const createSessionUseCase = async (ctx: {
 	userId: number;
 	input: TCreateSessionValidation;
 }) => {
-	const project = await findProjectById(ctx.input.id_project);
-	if (!project) throw new NotFoundException('Project tidak ditemukan.');
-	if (project.is_active !== 1) throw new InvalidParameterException('Project tidak aktif.');
+	if (ctx.input.id_project) {
+		const project = await findProjectById(ctx.input.id_project);
+		if (!project) throw new NotFoundException('Project tidak ditemukan.');
+		if (project.is_active !== 1) throw new InvalidParameterException('Project tidak aktif.');
+	}
 
 	const active = await queries.findActiveSessionByOwner(ctx.userId);
 	if (active)
@@ -20,7 +22,8 @@ export const createSessionUseCase = async (ctx: {
 		);
 
 	const idSession = await repo.insertSession({
-		idProject: ctx.input.id_project,
+		idProject: ctx.input.id_project ?? null,
+		idTestCase: ctx.input.id_test_case ?? null,
 		testCaseNo: ctx.input.test_case_no,
 		title: ctx.input.title,
 		description: ctx.input.description ?? null,

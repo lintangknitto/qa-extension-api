@@ -4,6 +4,8 @@ import * as domain from '../domain/session.domain';
 import * as queries from '../queries/session.queries';
 import * as repo from '../repo/session.repo';
 
+import * as tcRepo from '../../test-case/repo/test-case.repo';
+
 export const endSessionUseCase = async (ctx: {
 	userId: number;
 	userLevel: string | undefined;
@@ -16,6 +18,19 @@ export const endSessionUseCase = async (ctx: {
 
 	const result = domain.assertValidSessionResult(ctx.input.result);
 	await repo.completeSession(ctx.idSession, result, ctx.input.actual_result ?? null);
+
+	if (session.id_test_case) {
+		let testCaseStatus = 'Passed';
+		if (result === 'FAIL') testCaseStatus = 'Failed';
+		else if (result === 'BLOCKED') testCaseStatus = 'Re-Test';
+
+		await tcRepo.updateTestCaseStatusAndEvidence(
+			Number(session.id_test_case),
+			testCaseStatus,
+			ctx.input.actual_result ?? null,
+			ctx.idSession
+		);
+	}
 
 	const updated = domain.assertSessionExists(await queries.findSessionById(ctx.idSession));
 

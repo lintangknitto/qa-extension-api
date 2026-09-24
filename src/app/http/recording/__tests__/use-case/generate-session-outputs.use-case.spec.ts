@@ -97,7 +97,7 @@ describe('generateSessionOutputsUseCase', () => {
 			generateSessionOutputsUseCase({
 				idSession: 1,
 				userId: 99,
-				userLevel: 'IMPLEMENTOR',
+				userLevel: 'USER',
 				completer: { complete: jest.fn() }
 			})
 		).rejects.toThrow();

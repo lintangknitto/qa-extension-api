@@ -2,7 +2,8 @@ import { MySqlResultSetHeader } from '@knittotextile/knitto-mysql/dist/libs/MySq
 import mysqlConnection from '@/libs/config/mysqlConnection';
 
 export const insertSession = async (fields: {
-	idProject: number;
+	idProject?: number | null;
+	idTestCase?: number | null;
 	testCaseNo: string;
 	title: string;
 	description?: string | null;
@@ -11,10 +12,11 @@ export const insertSession = async (fields: {
 }): Promise<number> => {
 	const result = await mysqlConnection.raw<MySqlResultSetHeader>(
 		`INSERT INTO qa_recording_session
-			(id_project, test_case_no, title, description, target_url, owner_user_id, status, started_at)
-		 VALUES (?, ?, ?, ?, ?, ?, 'recording', NOW())`,
+			(id_project, id_test_case, test_case_no, title, description, target_url, owner_user_id, status, started_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'recording', NOW())`,
 		[
-			fields.idProject,
+			fields.idProject ?? null,
+			fields.idTestCase ?? null,
 			fields.testCaseNo,
 			fields.title,
 			fields.description ?? null,

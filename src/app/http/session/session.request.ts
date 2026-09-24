@@ -22,10 +22,19 @@ const ID_MSG = 'ID tidak valid.';
 const DATE_MSG = 'Tanggal harus format YYYY-MM-DD.';
 
 const createSessionValidation = object({
-	id_project: pipe(
-		number(ERROR_VALIDATION_MSG.number('ID project')),
-		integer(ID_MSG),
-		minValue(1, ID_MSG)
+	id_project: optional(
+		pipe(
+			number(ERROR_VALIDATION_MSG.number('ID project')),
+			integer(ID_MSG),
+			minValue(1, ID_MSG)
+		)
+	),
+	id_test_case: optional(
+		pipe(
+			number(ERROR_VALIDATION_MSG.number('ID test case')),
+			integer(ID_MSG),
+			minValue(1, ID_MSG)
+		)
 	),
 	test_case_no: pipe(
 		string(ERROR_VALIDATION_MSG.string('Nomor test case')),

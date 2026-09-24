@@ -11,9 +11,35 @@ declare namespace Entity {
 		updated_at?: string
 	}
 
+	interface IQaTestCase {
+		id_test_case?: number
+		id_project?: number
+		group_no?: string | null
+		feature?: string | null
+		process_no?: string | null
+		test_type?: string
+		test_case_id?: string
+		test_variable?: string | null
+		title?: string
+		pre_condition?: string | null
+		test_data?: string | null
+		test_steps?: string | null
+		expected_result?: string | null
+		actual_result?: string | null
+		status?: string
+		evidence?: string | null
+		remarks?: string | null
+		automation_tools?: string | null
+		last_session_id?: number | null
+		created_by_user_id?: number | null
+		created_at?: string
+		updated_at?: string
+	}
+
 	interface IQaRecordingSession {
 		id_session?: number
-		id_project?: number
+		id_project?: number | null
+		id_test_case?: number | null
 		test_case_no?: string
 		title?: string
 		description?: string | null
