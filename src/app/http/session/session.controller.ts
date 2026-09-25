@@ -4,13 +4,23 @@ import type {
 	TCreateSessionValidation,
 	TEndSessionValidation,
 	TListSessionValidation,
-	TSessionIdParamValidation
+	TSessionIdParamValidation,
+	TShareTokenParamValidation,
+	TPresignVideoUploadValidation,
+	TCompleteVideoUploadValidation
 } from './session.request';
 import { createSessionUseCase } from './use-case/create-session.use-case';
 import { listSessionsUseCase } from './use-case/list-session.use-case';
 import { detailSessionUseCase } from './use-case/detail-session.use-case';
 import { endSessionUseCase } from './use-case/end-session.use-case';
 import { createCheckpointUseCase } from './use-case/create-checkpoint.use-case';
+import { createShareUrlUseCase } from './use-case/create-share-url.use-case';
+import { getShareContextUseCase } from './use-case/get-share-context.use-case';
+import {
+	presignSessionVideoUseCase,
+	completeSessionVideoUseCase,
+	getSessionVideoUrlUseCase
+} from './use-case/session-video.use-case';
 
 const create: TRequestFunction = async (req) => {
 	const input = req.body as TCreateSessionValidation;
@@ -62,10 +72,67 @@ const createCheckpoint: TRequestFunction = async (req) => {
 	return { result, statusCode: 201 };
 };
 
+const createShareUrl: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	const hostUrl = `${req.protocol}://${req.get('host')}`;
+	const result = await createShareUrlUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		baseUrl: hostUrl
+	});
+	return { result };
+};
+
+const getShareAiContext: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TShareTokenParamValidation;
+	const result = await getShareContextUseCase(params.share_token);
+	return { result };
+};
+
+const presignVideo: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	const input = req.body as TPresignVideoUploadValidation;
+	const result = await presignSessionVideoUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input
+	});
+	return { result, statusCode: 201 };
+};
+
+const completeVideo: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	const input = req.body as TCompleteVideoUploadValidation;
+	const result = await completeSessionVideoUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input
+	});
+	return { result };
+};
+
+const getVideoUrl: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	const result = await getSessionVideoUrlUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level
+	});
+	return { result };
+};
+
 export default {
 	create,
 	list,
 	detail,
 	end,
-	createCheckpoint
+	createCheckpoint,
+	createShareUrl,
+	getShareAiContext,
+	presignVideo,
+	completeVideo,
+	getVideoUrl
 };

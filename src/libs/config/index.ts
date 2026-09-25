@@ -59,7 +59,7 @@ export const recordingConfig = {
 	NETWORK_BODY_MAX_BYTES: Number(process.env.RECORDING_NETWORK_BODY_MAX_BYTES || 256 * 1024),
 	ARTIFACT_CONTENT_TYPES: csv(
 		process.env.RECORDING_ARTIFACT_CONTENT_TYPES,
-		'image/png,image/jpeg,image/webp,application/json,text/plain'
+		'image/png,image/jpeg,image/webp,application/json,text/plain,video/webm'
 	)
 };
 

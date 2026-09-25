@@ -37,6 +37,21 @@ const guestPath: IGuestPathCfg[] = [
 	{
 		path: '/',
 		method: ['get']
+	},
+	{
+		path: '/share',
+		withSubPath: true,
+		method: ['get']
+	},
+	{
+		path: '/sessions/share',
+		withSubPath: true,
+		method: ['get']
+	},
+	{
+		path: '/api/v1/sessions/share',
+		withSubPath: true,
+		method: ['get']
 	}
 ];
 

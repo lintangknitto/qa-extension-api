@@ -120,10 +120,32 @@ const listSessionValidation = object({
 });
 export type TListSessionValidation = InferOutput<typeof listSessionValidation>;
 
+const shareTokenParamValidation = object({
+	share_token: pipe(
+		string('Share token tidak valid.'),
+		minLength(1, 'Share token tidak boleh kosong.')
+	)
+});
+export type TShareTokenParamValidation = InferOutput<typeof shareTokenParamValidation>;
+
+const presignVideoUploadValidation = object({
+	size_bytes: pipe(number(ERROR_VALIDATION_MSG.number('Ukuran video')), integer(ID_MSG), minValue(1, ID_MSG)),
+	content_type: optional(pipe(string(ERROR_VALIDATION_MSG.string('Content type'))))
+});
+export type TPresignVideoUploadValidation = InferOutput<typeof presignVideoUploadValidation>;
+
+const completeVideoUploadValidation = object({
+	object_key: pipe(string(ERROR_VALIDATION_MSG.string('Object key')), minLength(1, 'Object key tidak boleh kosong'))
+});
+export type TCompleteVideoUploadValidation = InferOutput<typeof completeVideoUploadValidation>;
+
 export default {
 	createSessionValidation,
 	sessionIdParamValidation,
 	endSessionValidation,
 	createCheckpointValidation,
-	listSessionValidation
+	listSessionValidation,
+	shareTokenParamValidation,
+	presignVideoUploadValidation,
+	completeVideoUploadValidation
 };

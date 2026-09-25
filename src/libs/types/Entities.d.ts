@@ -48,6 +48,9 @@ declare namespace Entity {
 		status?: string
 		result?: string | null
 		actual_result?: string | null
+		share_token?: string | null
+		video_url?: string | null
+		record_video?: number
 		last_sequence?: number
 		started_at?: string | null
 		ended_at?: string | null

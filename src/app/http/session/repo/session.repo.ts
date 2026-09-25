@@ -47,6 +47,20 @@ export const updateLastSequence = async (idSession: number, sequence: number): P
 	);
 };
 
+export const updateSessionShareToken = async (idSession: number, shareToken: string): Promise<void> => {
+	await mysqlConnection.raw<MySqlResultSetHeader>(
+		'UPDATE qa_recording_session SET share_token = ? WHERE id_session = ?',
+		[shareToken, idSession]
+	);
+};
+
+export const updateSessionVideoUrl = async (idSession: number, videoUrl: string): Promise<void> => {
+	await mysqlConnection.raw<MySqlResultSetHeader>(
+		'UPDATE qa_recording_session SET video_url = ? WHERE id_session = ?',
+		[videoUrl, idSession]
+	);
+};
+
 export const insertCheckpoint = async (fields: {
 	idSession: number;
 	note: string;

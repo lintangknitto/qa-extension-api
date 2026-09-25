@@ -52,6 +52,16 @@ export const findSessionById = async (idSession: number): Promise<Entity.IQaReco
 	return row ?? null;
 };
 
+export const findSessionByShareToken = async (
+	shareToken: string
+): Promise<Entity.IQaRecordingSession | null> => {
+	const [row] = await mysqlConnection.raw<Entity.IQaRecordingSession[]>(
+		'SELECT * FROM qa_recording_session WHERE share_token = ? LIMIT 1',
+		[shareToken]
+	);
+	return row ?? null;
+};
+
 export const findActiveSessionByOwner = async (
 	ownerUserId: number
 ): Promise<Entity.IQaRecordingSession | null> => {

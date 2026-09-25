@@ -4,7 +4,7 @@ import {
 	NotFoundException
 } from '@knittotextile/knitto-core-backend/dist/CoreException';
 
-export const ARTIFACT_KINDS = ['screenshot', 'network_body', 'console', 'dom', 'other'] as const;
+export const ARTIFACT_KINDS = ['screenshot', 'network_body', 'console', 'dom', 'video', 'other'] as const;
 export type TArtifactKind = (typeof ARTIFACT_KINDS)[number];
 
 export const ARTIFACT_STATUS = {
@@ -17,7 +17,8 @@ const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
 	'image/jpeg': 'jpg',
 	'image/webp': 'webp',
 	'application/json': 'json',
-	'text/plain': 'txt'
+	'text/plain': 'txt',
+	'video/webm': 'webm'
 };
 
 export const isSupportedArtifactKind = (kind: string): kind is TArtifactKind =>
