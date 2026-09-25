@@ -6,6 +6,7 @@ import {
 	maxValue,
 	minLength,
 	minValue,
+	nullish,
 	number,
 	object,
 	optional,
@@ -22,14 +23,14 @@ const ID_MSG = 'ID tidak valid.';
 const DATE_MSG = 'Tanggal harus format YYYY-MM-DD.';
 
 const createSessionValidation = object({
-	id_project: optional(
+	id_project: nullish(
 		pipe(
 			number(ERROR_VALIDATION_MSG.number('ID project')),
 			integer(ID_MSG),
 			minValue(1, ID_MSG)
 		)
 	),
-	id_test_case: optional(
+	id_test_case: nullish(
 		pipe(
 			number(ERROR_VALIDATION_MSG.number('ID test case')),
 			integer(ID_MSG),
@@ -46,10 +47,10 @@ const createSessionValidation = object({
 		minLength(1, ERROR_VALIDATION_MSG.minLength('Judul', 1)),
 		maxLength(SESSION_TITLE_MAX_LENGTH, ERROR_VALIDATION_MSG.maxLength('Judul', SESSION_TITLE_MAX_LENGTH))
 	),
-	description: optional(
+	description: nullish(
 		pipe(string(ERROR_VALIDATION_MSG.string('Deskripsi')), maxLength(5000, ERROR_VALIDATION_MSG.maxLength('Deskripsi', 5000)))
 	),
-	target_url: optional(
+	target_url: nullish(
 		pipe(string(ERROR_VALIDATION_MSG.string('Target URL')), maxLength(1000, ERROR_VALIDATION_MSG.maxLength('Target URL', 1000)))
 	)
 });
