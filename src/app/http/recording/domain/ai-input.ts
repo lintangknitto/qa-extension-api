@@ -97,17 +97,145 @@ export const summarizeEventCounts = (events: IAiInputEvent[]) => ({
 	artifacts: events.filter((event) => event.type === 'artifact').length
 });
 
+const isInternalExtensionEvent = (event: IAiInputEvent): boolean => {
+	const rawLocators = Array.isArray(event.payload.locators)
+		? (event.payload.locators as unknown[]).filter((l): l is string => typeof l === 'string')
+		: [];
+	const fallbackTarget = asString(event.payload.selector) || asString(event.payload.locator) || '';
+	const allLocs = [...rawLocators, fallbackTarget].join(' ');
+	if (allLocs.includes('qa-knitto-fab-host') || allLocs.includes('qa-knitto-')) return true;
+
+	const element = (event.payload.element && typeof event.payload.element === 'object')
+		? (event.payload.element as Record<string, unknown>)
+		: null;
+	if (element) {
+		const id = asString(element.id);
+		const testId = asString(element.testId);
+		const cssPath = asString(element.cssPath);
+		if (id.includes('qa-knitto') || testId.includes('qa-knitto') || cssPath.includes('qa-knitto')) return true;
+	}
+	return false;
+};
+
+const formatLocatorsSection = (locators: string[], fallbackTarget: string): string[] => {
+	const parts: string[] = [];
+	if (locators.length > 0) {
+		const firstLoc = locators[0].startsWith('page.') || locators[0].startsWith('locator(') || locators[0].startsWith('getBy')
+			? (locators[0].startsWith('page.') ? locators[0] : `page.${locators[0]}`)
+			: locators[0];
+		parts.push(`Primary Locator: ${firstLoc}`);
+		if (locators.length > 1) {
+			const altList = locators.slice(1, 4).map((l) =>
+				l.startsWith('page.') || l.startsWith('locator(') || l.startsWith('getBy')
+					? (l.startsWith('page.') ? l : `page.${l}`)
+					: l
+			).join(' | ');
+			parts.push(`Alternatif: [${altList}]`);
+		}
+	} else if (fallbackTarget) {
+		parts.push(`Target: ${fallbackTarget}`);
+	}
+	return parts;
+};
+
+const formatElementMetadata = (element: Record<string, unknown> | null, labelFallback: unknown): string[] => {
+	if (!element) return labelFallback ? [`Elemen: text="${asString(labelFallback).slice(0, 80)}"`] : [];
+	const tag = asString(element.tagName).toLowerCase();
+	const elText = asString(element.text) || asString(labelFallback);
+	const elRole = asString(element.role);
+	const elPlaceholder = asString(element.placeholder);
+	const elTestId = asString(element.testId);
+	const elName = asString(element.name);
+	const elType = asString(element.type);
+
+	const meta: string[] = [];
+	if (tag) meta.push(`<${tag}>`);
+	if (elTestId) meta.push(`data-testid="${elTestId}"`);
+	if (elRole) meta.push(`role="${elRole}"`);
+	if (elName) meta.push(`name="${elName}"`);
+	if (elPlaceholder) meta.push(`placeholder="${elPlaceholder}"`);
+	if (elType) meta.push(`type="${elType}"`);
+	if (elText) meta.push(`text="${elText.slice(0, 80)}"`);
+	return meta.length > 0 ? [`Elemen: ${meta.join(' ')}`] : [];
+};
+
+const formatActionValues = (actionKind: string, payload: Record<string, unknown>): string[] => {
+	const parts: string[] = [];
+	if (actionKind === 'input' || actionKind === 'fill') {
+		if (payload.value_redacted === true) {
+			parts.push('Input Value: [REDACTED/SENSITIF]');
+		} else if (payload.value !== undefined && payload.value !== null) {
+			parts.push(`Input Value: ${JSON.stringify(payload.value)}`);
+		}
+	} else if (actionKind === 'change') {
+		if (payload.selectedText) {
+			parts.push(`Pilih Opsi: ${JSON.stringify(payload.selectedText)}`);
+		}
+		if (payload.checked !== undefined) {
+			parts.push(`Centang: ${Boolean(payload.checked)}`);
+		}
+		if (payload.value !== undefined && payload.value !== null && !payload.selectedText) {
+			parts.push(payload.value_redacted === true ? 'Value: [REDACTED/SENSITIF]' : `Value: ${JSON.stringify(payload.value)}`);
+		}
+	} else if (actionKind === 'keydown') {
+		const key = asString(payload.key) || 'Enter';
+		parts.push(`Tekan Tombol: "${key}"`);
+	}
+	return parts;
+};
+
+const extractLocators = (payload: Record<string, unknown>, fallbackUrl?: string | null): { locators: string[]; fallbackTarget: string } => {
+	const rawLocators = Array.isArray(payload.locators)
+		? (payload.locators as unknown[]).filter((l): l is string => typeof l === 'string' && l.length > 0)
+		: [];
+	const fallbackTarget = asString(payload.selector) || asString(payload.locator) || fallbackUrl || '';
+	const locators = rawLocators.length > 0 ? rawLocators : (fallbackTarget ? [fallbackTarget] : []);
+	return { locators, fallbackTarget };
+};
+
+const formatActionEvent = (event: IAiInputEvent, stepIndex: number): string => {
+	const actionKind = (asString(event.payload.action) || asString(event.payload.type) || 'action').toLowerCase();
+	const { locators, fallbackTarget } = extractLocators(event.payload, event.url);
+
+	const element = (event.payload.element && typeof event.payload.element === 'object')
+		? (event.payload.element as Record<string, unknown>)
+		: null;
+
+	const parts = [
+		...formatLocatorsSection(locators, fallbackTarget),
+		...formatElementMetadata(element, event.payload.label),
+		...formatActionValues(actionKind, event.payload)
+	];
+
+	const detailStr = parts.length > 0 ? ` -> ${parts.join(' | ')}` : (fallbackTarget ? ` ${fallbackTarget}` : '');
+	return `${stepIndex}. [${actionKind.toUpperCase()}]${detailStr}`;
+};
+
+const formatStepEvent = (event: IAiInputEvent, stepIndex: number): string | null => {
+	if (event.type === 'navigation') {
+		const targetUrl = asString(event.payload.url) || event.url || '';
+		return `${stepIndex}. [NAVIGATE] Buka URL: ${targetUrl || '(tidak ada url)'}`;
+	}
+
+	if (event.type === 'action') {
+		return formatActionEvent(event, stepIndex);
+	}
+
+	return null;
+};
+
 const renderSteps = (events: IAiInputEvent[]): string => {
-	const actions = events.filter((event) => event.type === 'action').slice(0, 200);
-	if (actions.length === 0) return '(tidak ada action tercatat)';
-	return actions
-		.map((event) => {
-			const actionKind = asString(event.payload.action) || asString(event.payload.type) || 'action';
-			const target = asString(event.payload.selector) || asString(event.payload.locator) || event.url || '';
-			const label = asString(event.payload.label);
-			return `${event.sequence}. ${actionKind} ${target}${label ? ` (${label})` : ''}`.trim();
-		})
-		.join('\n');
+	const stepEvents = events
+		.filter((event) => (event.type === 'action' || event.type === 'navigation') && !isInternalExtensionEvent(event))
+		.slice(0, 300);
+	if (stepEvents.length === 0) return '(tidak ada action tercatat)';
+	const lines: string[] = [];
+	let stepIndex = 1;
+	for (const event of stepEvents) {
+		const rendered = formatStepEvent(event, stepIndex++);
+		if (rendered) lines.push(rendered);
+	}
+	return lines.length > 0 ? lines.join('\n') : '(tidak ada action tercatat)';
 };
 
 export const buildAiSessionContext = (input: IAiSessionInput): string => {

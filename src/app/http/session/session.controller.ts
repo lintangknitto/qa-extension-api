@@ -16,10 +16,12 @@ import { endSessionUseCase } from './use-case/end-session.use-case';
 import { createCheckpointUseCase } from './use-case/create-checkpoint.use-case';
 import { createShareUrlUseCase } from './use-case/create-share-url.use-case';
 import { getShareContextUseCase } from './use-case/get-share-context.use-case';
+import { InvalidParameterException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 import {
 	presignSessionVideoUseCase,
 	completeSessionVideoUseCase,
-	getSessionVideoUrlUseCase
+	getSessionVideoUrlUseCase,
+	uploadSessionVideoDirectUseCase
 } from './use-case/session-video.use-case';
 
 const create: TRequestFunction = async (req) => {
@@ -124,6 +126,31 @@ const getVideoUrl: TRequestFunction = async (req) => {
 	return { result };
 };
 
+const uploadVideoDirect: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	let buffer: Buffer;
+	let contentType = 'video/webm';
+
+	if (req.body && typeof req.body.video_base64 === 'string') {
+		buffer = Buffer.from(req.body.video_base64, 'base64');
+		if (req.body.content_type) contentType = req.body.content_type;
+	} else if (Buffer.isBuffer(req.body)) {
+		buffer = req.body;
+		contentType = req.headers['content-type'] || 'video/webm';
+	} else {
+		throw new InvalidParameterException('Payload video tidak valid.');
+	}
+
+	const result = await uploadSessionVideoDirectUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		videoBuffer: buffer,
+		contentType
+	});
+	return { result, statusCode: 201 };
+};
+
 export default {
 	create,
 	list,
@@ -134,5 +161,6 @@ export default {
 	getShareAiContext,
 	presignVideo,
 	completeVideo,
-	getVideoUrl
+	getVideoUrl,
+	uploadVideoDirect
 };

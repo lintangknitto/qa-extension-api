@@ -36,11 +36,12 @@
 			"@services/*": ["./src/services/*"]
 		}
 	},
-	"include": ["./**/*.ts"],
+	"include": ["src/**/*.ts"],
 	"exclude": [
 		"node_modules",
 		"dist",
 		"database",
+		"scripts",
 		"tests",
 		"jest.config.ts",
 		"jest-http.config.ts",

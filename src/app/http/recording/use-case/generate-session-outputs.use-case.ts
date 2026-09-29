@@ -15,6 +15,7 @@ import * as generationQueries from '../queries/generation.queries';
 import * as generationRepo from '../repo/generation.repo';
 import * as sessionQueries from '../../session/queries/session.queries';
 import * as sessionDomain from '../../session/domain/session.domain';
+import { emitGenerationStarted, emitGenerationCompleted, emitGenerationFailed } from '@/app/ws';
 
 export interface IGenerationRunResult {
 	status: 'completed' | 'failed';
@@ -56,25 +57,30 @@ export const generateSessionOutputsUseCase = async (ctx: {
 	const completer = ctx.completer ?? createOpenAiCompleter();
 	const results: Record<string, IGenerationRunResult> = {};
 
-	for (const kind of kinds) {
-		const idGeneration = await generationRepo.startGeneration({
-			idSession: ctx.idSession,
-			kind,
-			model: openAiConfig.MODEL,
-			promptVersion: GENERATION_PROMPT_VERSION
-		});
+	await Promise.all(
+		kinds.map(async (kind) => {
+			const idGeneration = await generationRepo.startGeneration({
+				idSession: ctx.idSession,
+				kind,
+				model: openAiConfig.MODEL,
+				promptVersion: GENERATION_PROMPT_VERSION
+			});
+			emitGenerationStarted(ctx.idSession, kind);
 
-		try {
-			const raw = await completer.complete({ system: buildSystemPrompt(kind), user: context });
-			const output = normalizeAiOutput(kind, raw);
-			await generationRepo.markGenerationCompleted(idGeneration, output);
-			results[kind] = { status: 'completed', output };
-		} catch (error) {
-			// Session tetap selesai meski AI gagal; retry dilakukan lewat endpoint yang sama.
-			await generationRepo.markGenerationFailed(idGeneration, (error as Error).message);
-			results[kind] = { status: 'failed', error: (error as Error).message };
-		}
-	}
+			try {
+				const raw = await completer.complete({ system: buildSystemPrompt(kind), user: context });
+				const output = normalizeAiOutput(kind, raw);
+				await generationRepo.markGenerationCompleted(idGeneration, output);
+				emitGenerationCompleted(ctx.idSession, kind, output);
+				results[kind] = { status: 'completed', output };
+			} catch (error) {
+				// Session tetap selesai meski AI gagal; retry dilakukan lewat endpoint yang sama.
+				await generationRepo.markGenerationFailed(idGeneration, (error as Error).message);
+				emitGenerationFailed(ctx.idSession, kind, (error as Error).message);
+				results[kind] = { status: 'failed', error: (error as Error).message };
+			}
+		})
+	);
 
 	return { results };
 };

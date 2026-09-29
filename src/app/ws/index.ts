@@ -13,6 +13,40 @@ type TAck = (response: unknown) => void;
 
 export const SESSION_ROOM = (idSession: number): string => `recording:session:${idSession}`;
 
+let ioInstance: SocketServer | null = null;
+
+export const getSocketIO = (): SocketServer | null => ioInstance;
+
+export const emitGenerationStarted = (idSession: number, kind: string): void => {
+	if (!ioInstance) return;
+	try {
+		ioInstance.to(SESSION_ROOM(idSession)).emit('generation:started', { idSession, kind });
+		ioInstance.emit('generation:started', { idSession, kind });
+	} catch (err) {
+		logger.warn(`Gagal emit generation:started: ${(err as Error).message}`);
+	}
+};
+
+export const emitGenerationCompleted = (idSession: number, kind: string, output?: string): void => {
+	if (!ioInstance) return;
+	try {
+		ioInstance.to(SESSION_ROOM(idSession)).emit('generation:completed', { idSession, kind, output });
+		ioInstance.emit('generation:completed', { idSession, kind, output });
+	} catch (err) {
+		logger.warn(`Gagal emit generation:completed: ${(err as Error).message}`);
+	}
+};
+
+export const emitGenerationFailed = (idSession: number, kind: string, error?: string): void => {
+	if (!ioInstance) return;
+	try {
+		ioInstance.to(SESSION_ROOM(idSession)).emit('generation:failed', { idSession, kind, error });
+		ioInstance.emit('generation:failed', { idSession, kind, error });
+	} catch (err) {
+		logger.warn(`Gagal emit generation:failed: ${(err as Error).message}`);
+	}
+};
+
 export const initSocketIO = (
 	httpServer: Server<typeof IncomingMessage, typeof ServerResponse>
 ) => {
@@ -23,6 +57,7 @@ export const initSocketIO = (
 		},
 		path: '/knitto-socket'
 	});
+	ioInstance = io;
 
 	// Handshake wajib membawa JWT valid; user dimuat ulang agar token lama yang
 	// usernya sudah dihapus tidak bisa dipakai.

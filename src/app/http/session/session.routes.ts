@@ -2,6 +2,7 @@ import { Router, requestHandler, requestValidator } from '@knittotextile/knitto-
 import controller from './session.controller';
 import request from './session.request';
 import { renderShareHtml } from './use-case/render-share-page';
+import { streamSessionVideoUseCase } from './use-case/session-video.use-case';
 
 const router = Router();
 
@@ -56,23 +57,46 @@ router.get(
 );
 
 router.post(
-	'/sessions/:id_session/video/presign-upload',
+	['/sessions/:id_session/video/upload', '/api/v1/sessions/:id_session/video/upload'],
+	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
+	requestHandler(controller.uploadVideoDirect)
+);
+
+router.post(
+	['/sessions/:id_session/video/presign-upload', '/api/v1/sessions/:id_session/video/presign-upload'],
 	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
 	requestValidator({ requestType: 'body', type: request.presignVideoUploadValidation }),
 	requestHandler(controller.presignVideo)
 );
 
 router.post(
-	'/sessions/:id_session/video/complete',
+	['/sessions/:id_session/video/complete', '/api/v1/sessions/:id_session/video/complete'],
 	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
 	requestValidator({ requestType: 'body', type: request.completeVideoUploadValidation }),
 	requestHandler(controller.completeVideo)
 );
 
 router.get(
-	'/sessions/:id_session/video',
+	['/sessions/:id_session/video', '/api/v1/sessions/:id_session/video'],
 	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
 	requestHandler(controller.getVideoUrl)
+);
+
+router.get(
+	['/sessions/:id_session/video/stream', '/api/v1/sessions/:id_session/video/stream'],
+	async (req, res, next) => {
+		try {
+			const idSession = Number(req.params.id_session);
+			const video = await streamSessionVideoUseCase({ idSession });
+			res.setHeader('Content-Type', video.contentType || 'video/webm');
+			res.setHeader('Accept-Ranges', 'bytes');
+			res.setHeader('Content-Length', video.size);
+			res.setHeader('Access-Control-Allow-Origin', '*');
+			(video.stream as any).pipe(res);
+		} catch (err) {
+			next(err);
+		}
+	}
 );
 
 router.get('/share/:share_token', async (req, res, next) => {
@@ -88,3 +112,4 @@ router.get('/share/:share_token', async (req, res, next) => {
 });
 
 export default router;
+

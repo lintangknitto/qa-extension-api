@@ -59,3 +59,20 @@ export const statArtifactObject = (
 	objectKey: string,
 	client: IMinioStatClient = getMinioClient()
 ): Promise<IMinioStatResult> => client.statObject(minioConfig.BUCKET, objectKey);
+
+export const getArtifactObjectStream = (
+	objectKey: string,
+	client: Client = getMinioClient()
+): Promise<NodeJS.ReadableStream> => client.getObject(minioConfig.BUCKET, objectKey);
+
+export const putArtifactObjectBuffer = async (
+	objectKey: string,
+	buffer: Buffer,
+	contentType: string = 'video/webm',
+	client: Client = getMinioClient()
+): Promise<void> => {
+	await client.putObject(minioConfig.BUCKET, objectKey, buffer, buffer.length, {
+		'Content-Type': contentType
+	});
+};
+

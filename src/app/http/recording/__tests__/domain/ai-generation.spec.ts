@@ -41,6 +41,11 @@ describe('ai-generation', () => {
 			expect(normalizeAiOutput('playwright', raw)).toBe('import { test } from "@playwright/test";');
 		});
 
+		it('mengekstrak code fence meskipun ada teks pembuka dari AI', () => {
+			const raw = 'Berikut adalah skripnya:\n```typescript\nimport { test } from "@playwright/test";\n```\nSemoga membantu!';
+			expect(normalizeAiOutput('playwright', raw)).toBe('import { test } from "@playwright/test";');
+		});
+
 		it('menerima output Playwright tanpa fence', () => {
 			expect(normalizeAiOutput('playwright', 'const a = 1;')).toBe('const a = 1;');
 		});

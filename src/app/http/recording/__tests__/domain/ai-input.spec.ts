@@ -52,6 +52,57 @@ describe('ai-input', () => {
 			const context = buildAiSessionContext({ session: {}, events: [], checkpoints: [] });
 			expect(context).toContain('(tidak ada checkpoint)');
 		});
+
+		it('merender langkah secara kaya lengkap dengan locator candidates, input value, dan key', () => {
+			const richEvents = [
+				{
+					type: 'navigation',
+					sequence: 1,
+					payload: { url: 'https://chat.knitto.org/chat' }
+				},
+				{
+					type: 'action',
+					sequence: 2,
+					payload: {
+						action: 'click',
+						locators: ["getByRole('button', { name: 'Kirim' })", "locator('#btn-send')"],
+						element: { tagName: 'BUTTON', role: 'button', text: 'Kirim', testId: 'send-btn' }
+					}
+				},
+				{
+					type: 'action',
+					sequence: 3,
+					payload: {
+						action: 'input',
+						locators: ["getByPlaceholder('Ketik pesan...')"],
+						element: { tagName: 'TEXTAREA', placeholder: 'Ketik pesan...' },
+						value: 'Pesan uji otomatis'
+					}
+				},
+				{
+					type: 'action',
+					sequence: 4,
+					payload: {
+						action: 'keydown',
+						locators: ["getByPlaceholder('Ketik pesan...')"],
+						key: 'Enter'
+					}
+				}
+			];
+
+			const context = buildAiSessionContext({
+				session: { test_case_no: 'TC-CHAT-1', title: 'Kirim Pesan' },
+				events: richEvents,
+				checkpoints: []
+			});
+
+			expect(context).toContain('1. [NAVIGATE] Buka URL: https://chat.knitto.org/chat');
+			expect(context).toContain("Primary Locator: page.getByRole('button', { name: 'Kirim' })");
+			expect(context).toContain('Alternatif: [page.locator(\'#btn-send\')]');
+			expect(context).toContain('data-testid="send-btn"');
+			expect(context).toContain('Input Value: "Pesan uji otomatis"');
+			expect(context).toContain('Tekan Tombol: "Enter"');
+		});
 	});
 
 	describe('parseStoredEvent', () => {

@@ -32,6 +32,7 @@
 		"lint": "eslint --fix \"src/app/http/**/*.ts\"",
 		"lint:fix": "eslint --fix \"src/app/http/**/*.ts\"",
 		"type-check": "tsc --noEmit -p tsconfig.json",
+		"clean:data": "tsx scripts/clean-db.ts",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:coverage": "jest --coverage"
