@@ -110,15 +110,25 @@ declare namespace Entity {
 		created_at?: string
 	}
 
+	interface IQaUserProject {
+		id_user?: number
+		id_project?: number
+		created_at?: string
+		created_by?: number | null
+	}
+
 	interface IUser {
 		id_user?: number
 		nama?: string
 		username?: string
 		password?: string
 		level?: string
+		is_active?: number
 		aktif?: number
 		status_login?: string
 		hint_password?: string
 		ip_addres?: string
+		created_at?: string
+		updated_at?: string
 	}
 }

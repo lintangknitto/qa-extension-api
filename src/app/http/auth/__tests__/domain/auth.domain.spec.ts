@@ -1,5 +1,5 @@
 import * as domain from '../../domain/auth.domain';
-import { InvalidParameterException } from '@knittotextile/knitto-core-backend/dist/CoreException';
+import { InvalidParameterException, NotAuthorizationException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 
 describe('auth.domain', () => {
 	describe('generateToken', () => {
@@ -25,7 +25,8 @@ describe('auth.domain', () => {
 				id_user: 1,
 				nama: 'Test User',
 				username: 'testuser',
-				level: 'IMPLEMENTOR'
+				level: 'IMPLEMENTOR',
+				is_active: 1
 			} as const satisfies Partial<Entity.IUser> as Entity.IUser;
 
 			const result = domain.transformUserResponse(user);
@@ -35,6 +36,7 @@ describe('auth.domain', () => {
 				nama: 'Test User',
 				username: 'testuser',
 				level: 'IMPLEMENTOR',
+				is_active: true,
 				input: 'enable'
 			});
 		});
@@ -44,12 +46,14 @@ describe('auth.domain', () => {
 				id_user: 1,
 				nama: 'Test User',
 				username: 'testuser',
-				level: 'USER'
+				level: 'USER',
+				is_active: 1
 			} as const satisfies Partial<Entity.IUser> as Entity.IUser;
 
 			const result = domain.transformUserResponse(user);
 
 			expect(result.input).toBe('disable');
+			expect(result.is_active).toBe(true);
 		});
 	});
 
@@ -58,7 +62,8 @@ describe('auth.domain', () => {
 			const user = {
 				id_user: 1,
 				nama: 'Test User',
-				username: 'testuser'
+				username: 'testuser',
+				is_active: 1
 			} as const satisfies Partial<Entity.IUser> as Entity.IUser;
 
 			expect(() => {
@@ -70,6 +75,39 @@ describe('auth.domain', () => {
 			expect(() => {
 				domain.validateUser(null);
 			}).toThrow(InvalidParameterException);
+		});
+
+		it('should throw NotAuthorizationException for inactive user', () => {
+			const inactiveUser = {
+				id_user: 2,
+				nama: 'Deactivated User',
+				username: 'inactive',
+				is_active: 0
+			} as const satisfies Partial<Entity.IUser> as Entity.IUser;
+
+			expect(() => {
+				domain.validateUser(inactiveUser);
+			}).toThrow(NotAuthorizationException);
+		});
+	});
+
+	describe('validatePasswordMatch', () => {
+		it('should not throw when valid is true', () => {
+			expect(() => domain.validatePasswordMatch(true)).not.toThrow();
+		});
+
+		it('should throw InvalidParameterException when valid is false', () => {
+			expect(() => domain.validatePasswordMatch(false)).toThrow(InvalidParameterException);
+		});
+	});
+
+	describe('validateOldPasswordMatch', () => {
+		it('should not throw when valid is true', () => {
+			expect(() => domain.validateOldPasswordMatch(true)).not.toThrow();
+		});
+
+		it('should throw InvalidParameterException when valid is false', () => {
+			expect(() => domain.validateOldPasswordMatch(false)).toThrow(InvalidParameterException);
 		});
 	});
 });

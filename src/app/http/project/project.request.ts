@@ -55,7 +55,6 @@ const updateProjectValidation = object({
 			maxLength(150, ERROR_VALIDATION_MSG.maxLength('Nama project', 150))
 		)
 	),
-	code: optional(codeSchema),
 	description: optional(
 		pipe(
 			string(ERROR_VALIDATION_MSG.string('Deskripsi')),

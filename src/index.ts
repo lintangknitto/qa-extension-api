@@ -11,6 +11,7 @@ import {
 	assertRecordingInfraConfigured,
 	currentRecordingInfraSettings
 } from './libs/config/recording-infra';
+import { ensureDatabaseSchema } from './libs/config/init-database-schema';
 // import rabbitConnection from './libs/config/rabbitConnection';
 
 (
@@ -21,6 +22,7 @@ import {
 
 			// start infrastructure
 			await mysqlConnection.init();
+			await ensureDatabaseSchema();
 			// await rabbitConnection.init();
 
 			// start application

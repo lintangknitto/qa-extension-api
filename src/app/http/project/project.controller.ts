@@ -23,13 +23,21 @@ const create: TRequestFunction = async (req) => {
 
 const list: TRequestFunction = async (req) => {
 	const input = req.query as unknown as TListProjectValidation;
-	const result = await listProjectsUseCase({ userLevel: req.userData?.level, input });
+	const result = await listProjectsUseCase({
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input
+	});
 	return { result };
 };
 
 const listActive: TRequestFunction = async (req) => {
 	const input = req.query as unknown as TListProjectValidation;
-	const result = await listActiveProjectsUseCase({ input });
+	const result = await listActiveProjectsUseCase({
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input
+	});
 	return { result };
 };
 
@@ -57,6 +65,7 @@ const update: TRequestFunction = async (req) => {
 const deactivate: TRequestFunction = async (req) => {
 	const params = req.params as unknown as TProjectIdParamValidation;
 	const result = await deactivateProjectUseCase({
+		userId: req.userId,
 		userLevel: req.userData?.level,
 		idProject: params.id_project
 	});

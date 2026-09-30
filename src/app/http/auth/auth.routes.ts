@@ -15,4 +15,13 @@ router.post(
 
 router.get('/auth/logout', requestHandler(controller.logout));
 
+router.post(
+	'/auth/change-password',
+	requestValidator({
+		requestType: 'body',
+		type: request.changePasswordValidation
+	}),
+	requestHandler(controller.changePassword)
+);
+
 export default router;

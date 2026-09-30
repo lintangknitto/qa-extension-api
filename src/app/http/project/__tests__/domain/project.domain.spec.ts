@@ -46,6 +46,41 @@ describe('project.domain', () => {
 		});
 	});
 
+	describe('canManageSpecificProject & assertCanManageSpecificProject', () => {
+		const sampleProject: Entity.IQaProject = {
+			id_project: 10,
+			name: 'Test Project',
+			created_by_user_id: 3
+		};
+
+		it('mengizinkan SUPERADMIN dan ADMIN mengelola project apa pun', () => {
+			expect(domain.canManageSpecificProject('SUPERADMIN', 99, sampleProject)).toBe(true);
+			expect(domain.canManageSpecificProject('ADMIN', 99, sampleProject)).toBe(true);
+			expect(() => domain.assertCanManageSpecificProject('SUPERADMIN', 99, sampleProject)).not.toThrow();
+			expect(() => domain.assertCanManageSpecificProject('ADMIN', 99, sampleProject)).not.toThrow();
+		});
+
+		it('mengizinkan QA jika merupakan creator (created_by_user_id === userId)', () => {
+			expect(domain.canManageSpecificProject('QA', 3, sampleProject)).toBe(true);
+			expect(() => domain.assertCanManageSpecificProject('QA', 3, sampleProject)).not.toThrow();
+		});
+
+		it('menolak QA jika bukan creator', () => {
+			expect(domain.canManageSpecificProject('QA', 4, sampleProject)).toBe(false);
+			expect(() => domain.assertCanManageSpecificProject('QA', 4, sampleProject)).toThrow(
+				NotAuthorizationException
+			);
+		});
+
+		it('menolak IMPLEMENTOR dan VIEWER', () => {
+			expect(domain.canManageSpecificProject('IMPLEMENTOR', 3, sampleProject)).toBe(false);
+			expect(domain.canManageSpecificProject('VIEWER', 3, sampleProject)).toBe(false);
+			expect(() => domain.assertCanManageSpecificProject('IMPLEMENTOR', 3, sampleProject)).toThrow(
+				NotAuthorizationException
+			);
+		});
+	});
+
 	describe('resolveProjectCode', () => {
 		it('memakai code bila diberikan', () => {
 			expect(domain.resolveProjectCode('Nama Panjang', 'kode-pendek')).toBe('kode-pendek');
@@ -86,12 +121,14 @@ describe('project.domain', () => {
 	});
 
 	describe('toProjectResponse', () => {
-		it('mengubah is_active angka menjadi boolean', () => {
-			const active = domain.toProjectResponse({ id_project: 1, is_active: 1 });
+		it('mengubah is_active angka menjadi boolean dan menyertakan created_by_user_id', () => {
+			const active = domain.toProjectResponse({ id_project: 1, is_active: 1, created_by_user_id: 5 });
 			const inactive = domain.toProjectResponse({ id_project: 2, is_active: 0 });
 
 			expect(active.is_active).toBe(true);
+			expect(active.created_by_user_id).toBe(5);
 			expect(inactive.is_active).toBe(false);
+			expect(inactive.created_by_user_id).toBeNull();
 		});
 
 		it('mengosongkan field yang tidak ada menjadi null', () => {

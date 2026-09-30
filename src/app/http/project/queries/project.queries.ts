@@ -1,8 +1,10 @@
 import mysqlConnection from '@/libs/config/mysqlConnection';
 
-interface IProjectFilter {
+export interface IProjectFilter {
 	search?: string;
 	isActive?: boolean;
+	userId?: number;
+	isGlobalAdmin?: boolean;
 }
 
 const buildFilter = (filter: IProjectFilter): { where: string; params: unknown[] } => {
@@ -18,6 +20,12 @@ const buildFilter = (filter: IProjectFilter): { where: string; params: unknown[]
 	if (filter.isActive !== undefined) {
 		clauses.push('is_active = ?');
 		params.push(filter.isActive ? 1 : 0);
+	}
+
+	if (!filter.isGlobalAdmin && filter.userId) {
+		// Scoping: project yang di-assign ke user, atau semua project jika belum ada assignment terdaftar untuk user tersebut
+		clauses.push('(id_project IN (SELECT id_project FROM qa_user_project WHERE id_user = ?) OR NOT EXISTS (SELECT 1 FROM qa_user_project WHERE id_user = ?))');
+		params.push(filter.userId, filter.userId);
 	}
 
 	return {
@@ -47,9 +55,10 @@ export const listProjects = async (options: {
 	perPage: number;
 	search?: string;
 	isActive?: boolean;
+	userId?: number;
+	isGlobalAdmin?: boolean;
 }): Promise<Entity.IQaProject[]> => {
 	const { where, params } = buildFilter(options);
-	// perPage & offset sudah berupa integer tervalidasi dari normalizePagination.
 	return mysqlConnection.raw<Entity.IQaProject[]>(
 		`SELECT * FROM qa_project ${where} ORDER BY created_at DESC, id_project DESC LIMIT ${options.perPage} OFFSET ${options.offset}`,
 		params
@@ -69,7 +78,24 @@ export const listActiveProjects = async (options: {
 	offset: number;
 	perPage: number;
 	search?: string;
+	userId?: number;
+	isGlobalAdmin?: boolean;
 }): Promise<Entity.IQaProject[]> => listProjects({ ...options, isActive: true });
 
-export const countActiveProjects = async (search?: string): Promise<number> =>
-	countProjects({ search, isActive: true });
+export const countActiveProjects = async (options?: {
+	search?: string;
+	userId?: number;
+	isGlobalAdmin?: boolean;
+}): Promise<number> => countProjects({ ...options, isActive: true });
+
+export const countProjectAssociatedData = async (idProject: number): Promise<number> => {
+	const [tcRow] = await mysqlConnection.raw<Array<{ total: number }>>(
+		'SELECT COUNT(*) AS total FROM qa_test_case WHERE id_project = ?',
+		[idProject]
+	);
+	const [sessRow] = await mysqlConnection.raw<Array<{ total: number }>>(
+		'SELECT COUNT(*) AS total FROM qa_recording_session WHERE id_project = ?',
+		[idProject]
+	);
+	return Number(tcRow?.total ?? 0) + Number(sessRow?.total ?? 0);
+};

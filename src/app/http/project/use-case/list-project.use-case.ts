@@ -13,15 +13,29 @@ const resolveActiveFilter = (
 
 export const listProjectsUseCase = async (ctx: {
 	userLevel: string | undefined;
+	userId?: number;
 	input: TListProjectValidation;
 }) => {
 	domain.assertCanManageProjects(ctx.userLevel, PROJECT_ADMIN_LEVELS);
 	const { page, perPage, offset } = domain.normalizePagination(ctx.input.page, ctx.input.perPage);
 	const isActive = resolveActiveFilter(ctx.input.is_active);
+	const isGlobalAdmin = domain.canManageProjects(ctx.userLevel, PROJECT_ADMIN_LEVELS);
 
 	const [rows, total] = await Promise.all([
-		queries.listProjects({ offset, perPage, search: ctx.input.search, isActive }),
-		queries.countProjects({ search: ctx.input.search, isActive })
+		queries.listProjects({
+			offset,
+			perPage,
+			search: ctx.input.search,
+			isActive,
+			userId: ctx.userId,
+			isGlobalAdmin
+		}),
+		queries.countProjects({
+			search: ctx.input.search,
+			isActive,
+			userId: ctx.userId,
+			isGlobalAdmin
+		})
 	]);
 
 	return {
@@ -31,14 +45,29 @@ export const listProjectsUseCase = async (ctx: {
 };
 
 /**
- * Daftar project aktif untuk tester — tersedia bagi semua user yang sudah login.
+ * Daftar project aktif untuk tester — disaring sesuai assigned project user kecuali Superadmin/Admin.
  */
-export const listActiveProjectsUseCase = async (ctx: { input: TListProjectValidation }) => {
+export const listActiveProjectsUseCase = async (ctx: {
+	userId?: number;
+	userLevel?: string;
+	input: TListProjectValidation;
+}) => {
 	const { page, perPage, offset } = domain.normalizePagination(ctx.input.page, ctx.input.perPage);
+	const isGlobalAdmin = ctx.userLevel ? ['SUPERADMIN', 'ADMIN'].includes(ctx.userLevel.toUpperCase()) : false;
 
 	const [rows, total] = await Promise.all([
-		queries.listActiveProjects({ offset, perPage, search: ctx.input.search }),
-		queries.countActiveProjects(ctx.input.search)
+		queries.listActiveProjects({
+			offset,
+			perPage,
+			search: ctx.input.search,
+			userId: ctx.userId,
+			isGlobalAdmin
+		}),
+		queries.countActiveProjects({
+			search: ctx.input.search,
+			userId: ctx.userId,
+			isGlobalAdmin
+		})
 	]);
 
 	return {

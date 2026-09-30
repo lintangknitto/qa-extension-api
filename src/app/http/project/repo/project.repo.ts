@@ -73,3 +73,18 @@ export const setProjectActive = async (idProject: number, isActive: boolean): Pr
 		[isActive ? 1 : 0, idProject]
 	);
 };
+
+export const deleteProjectPermanently = async (idProject: number): Promise<void> => {
+	try {
+		await mysqlConnection.raw<MySqlResultSetHeader>(
+			'DELETE FROM qa_user_project WHERE id_project = ?',
+			[idProject]
+		);
+	} catch {
+		// ignore
+	}
+	await mysqlConnection.raw<MySqlResultSetHeader>(
+		'DELETE FROM qa_project WHERE id_project = ?',
+		[idProject]
+	);
+};

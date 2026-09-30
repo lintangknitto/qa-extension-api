@@ -6,6 +6,7 @@ const path_1 = tslib_1.__importDefault(require("path"));
 dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../.env') });
 const knitto_mysql_1 = require("@knittotextile/knitto-mysql");
 const Minio = tslib_1.__importStar(require("minio"));
+
 const mysql = new knitto_mysql_1.MySqlConnector({
     host: process.env.DB_HOST_MYSQL || '127.0.0.1',
     database: process.env.DB_NAME_MYSQL || 'qa_recorder',
@@ -15,6 +16,7 @@ const mysql = new knitto_mysql_1.MySqlConnector({
     connectionLimit: 5,
     dateStrings: true
 });
+
 const minioClient = new Minio.Client({
     endPoint: process.env.MINIO_ENDPOINT || '127.0.0.1',
     port: Number(process.env.MINIO_PORT || 9000),
@@ -22,15 +24,16 @@ const minioClient = new Minio.Client({
     accessKey: process.env.MINIO_ACCESS_KEY || 'qa_minio',
     secretKey: process.env.MINIO_SECRET_KEY || 'qa_minio_secret'
 });
+
 const bucketName = process.env.MINIO_BUCKET || 'qa-recording-artifacts';
+
 async function main() {
-    console.log('=== Memulai Proses Cleansing Data QA Recorder ===');
+    console.log('=== Memulai Proses Cleansing & Seeding Data QA Recorder ===');
     await mysql.init();
-    // 1. List semua tabel di database
     const tables = await mysql.raw('SHOW TABLES');
     const tableNames = tables.map((t) => Object.values(t)[0]);
     console.log('Tabel terdeteksi:', tableNames);
-    // Target tabel yang akan dibersihkan (mengecualikan tabel user / auth)
+
     const targetTables = [
         'qa_recording_checkpoint',
         'qa_recording_checkpoints',
@@ -44,19 +47,22 @@ async function main() {
         'qa_recording_sessions',
         'qa_test_case',
         'qa_test_cases',
+        'qa_user_project',
+        'qa_user_projects',
         'qa_project',
-        'qa_projects'
+        'qa_projects',
+        'user'
     ].filter((t) => tableNames.includes(t));
-    console.log('Tabel yang akan dibersihkan:', targetTables);
+
+    console.log('Tabel yang akan dibersihkan & di-reset:', targetTables);
+
     await mysql.raw('SET FOREIGN_KEY_CHECKS = 0');
     for (const table of targetTables) {
-        const countBefore = await mysql.raw(`SELECT COUNT(*) AS total FROM \`${table}\``);
-        const total = Number(countBefore[0]?.total ?? 0);
         await mysql.raw(`TRUNCATE TABLE \`${table}\``);
-        console.log(`✓ Tabel ${table} berhasil dibersihkan (${total} baris dihapus).`);
+        console.log(`✓ Tabel ${table} berhasil di-truncate.`);
     }
     await mysql.raw('SET FOREIGN_KEY_CHECKS = 1');
-    // 2. Membersihkan object di MinIO bucket jika ada
+
     try {
         const exists = await minioClient.bucketExists(bucketName);
         if (exists) {
@@ -65,8 +71,7 @@ async function main() {
             const objectsList = [];
             await new Promise((resolve, reject) => {
                 stream.on('data', (obj) => {
-                    if (obj.name)
-                        objectsList.push(obj.name);
+                    if (obj.name) objectsList.push(obj.name);
                 });
                 stream.on('error', (err) => reject(err));
                 stream.on('end', () => resolve());
@@ -75,19 +80,59 @@ async function main() {
                 console.log(`Menghapus ${objectsList.length} file artifact dari MinIO...`);
                 await minioClient.removeObjects(bucketName, objectsList);
                 console.log(`✓ ${objectsList.length} file di MinIO bucket berhasil dibersihkan.`);
-            }
-            else {
+            } else {
                 console.log('MinIO bucket sudah kosong.');
             }
         }
-    }
-    catch (minioErr) {
+    } catch (minioErr) {
         console.warn('Peringatan MinIO:', minioErr.message);
     }
-    console.log('=== Cleansing Selesai dengan Sukses! ===');
+
+    console.log('\n--- Melakukan Seeding User & Hak Akses ---');
+    await mysql.raw(`
+        INSERT INTO \`user\` (\`id_user\`, \`nama\`, \`username\`, \`password\`, \`level\`, \`is_active\`, \`aktif\`)
+        VALUES
+            (1, 'Super Administrator', 'superadmin', md5('superadmin123'), 'SUPERADMIN', 1, 1),
+            (2, 'QA Administrator', 'admin', md5('admin123'), 'ADMIN', 1, 1),
+            (3, 'Senior QA Tester', 'qatester', md5('qatester123'), 'QA', 1, 1),
+            (4, 'QA Lead Engineer', 'qaadmin', md5('qaadmin123'), 'QA', 1, 1),
+            (5, 'Frontend Developer', 'developer', md5('developer123'), 'IMPLEMENTOR', 1, 1),
+            (6, 'Backend Implementor', 'implementor', md5('implementor123'), 'IMPLEMENTOR', 1, 1),
+            (7, 'Product Stakeholder', 'viewer', md5('viewer123'), 'VIEWER', 1, 1);
+    `);
+    console.log('✓ Berhasil melakukan seed 7 user (SUPERADMIN, ADMIN, QA, IMPLEMENTOR, VIEWER).');
+
+    if (tableNames.includes('qa_project') || tableNames.includes('qa_projects')) {
+        const projectTable = tableNames.includes('qa_project') ? 'qa_project' : 'qa_projects';
+        await mysql.raw(`
+            INSERT INTO \`${projectTable}\` (\`id_project\`, \`name\`, \`code\`, \`description\`, \`base_url\`, \`is_active\`, \`created_by_user_id\`)
+            VALUES
+                (1, 'Knitto Portal E-Commerce', 'KNITTO-PORTAL', 'Automasi pengujian web katalog kain, cart, dan checkout pemesanan online', 'https://knitto.co.id', 1, 1),
+                (2, 'Knitto Internal ERP & POS', 'KNITTO-ERP', 'Automasi pengujian modul stock gudang, transaksi kasir POS, dan master user', 'http://localhost:3000', 1, 1);
+        `);
+        console.log('✓ Berhasil melakukan seed 2 master project (KNITTO-PORTAL, KNITTO-ERP).');
+    }
+
+    if (tableNames.includes('qa_user_project') || tableNames.includes('qa_user_projects')) {
+        const userProjTable = tableNames.includes('qa_user_project') ? 'qa_user_project' : 'qa_user_projects';
+        await mysql.raw(`
+            INSERT INTO \`${userProjTable}\` (\`id_user\`, \`id_project\`, \`created_by\`)
+            VALUES
+                (3, 1, 1),
+                (3, 2, 1),
+                (5, 1, 1),
+                (6, 2, 1),
+                (7, 1, 1),
+                (7, 2, 1);
+        `);
+        console.log('✓ Berhasil melakukan seed relasi user project scoping.');
+    }
+
+    console.log('\n=== Database Cleansing & Seeding Selesai dengan Sukses! ===');
     process.exit(0);
 }
+
 main().catch((err) => {
-    console.error('Gagal cleansing database:', err);
+    console.error('Gagal cleansing & seeding database:', err);
     process.exit(1);
 });
