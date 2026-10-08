@@ -1,6 +1,9 @@
 import { grafanaConfig } from '@/libs/config';
 import { GeneralException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 
+/** Batas waktu per request ke Grafana: Grafana yang lambat/hang tidak boleh menggantung investigasi. */
+const GRAFANA_REQUEST_TIMEOUT_MS = 10_000;
+
 export interface IGrafanaDatasource {
 	id: number;
 	uid: string;
@@ -11,15 +14,25 @@ export interface IGrafanaDatasource {
 
 export interface ILokiLogEntry {
 	timestamp: string;
+	/** Timestamp asli Loki (nanodetik) — menjaga urutan baris log multiline dalam milidetik yang sama. */
+	timestampNs?: string;
 	line: string;
 	labels?: Record<string, string>;
 }
+
+/** Bandingkan timestamp nanodetik (string) tanpa kehilangan presisi. */
+export const compareNs = (a?: string, b?: string): number => {
+	const x = a ?? '0';
+	const y = b ?? '0';
+	return x.length !== y.length ? x.length - y.length : x < y ? -1 : x > y ? 1 : 0;
+};
 
 export class GrafanaService {
 	private readonly baseUrl: string;
 	private readonly token: string;
 	private readonly lokiUid: string;
 	private readonly prometheusUid: string;
+	private readonly discoveredUids = new Map<string, Promise<string>>();
 
 	constructor(config?: {
 		baseUrl?: string;
@@ -47,7 +60,8 @@ export class GrafanaService {
 	public async checkHealth(): Promise<{ database: string; version?: string }> {
 		try {
 			const res = await fetch(`${this.baseUrl}/api/health`, {
-				headers: this.getHeaders()
+				headers: this.getHeaders(),
+				signal: AbortSignal.timeout(GRAFANA_REQUEST_TIMEOUT_MS)
 			});
 			if (!res.ok) throw new GeneralException(`Grafana health error: HTTP ${res.status}`);
 			return (await res.json()) as { database: string; version?: string };
@@ -60,13 +74,74 @@ export class GrafanaService {
 	public async listDatasources(): Promise<IGrafanaDatasource[]> {
 		try {
 			const res = await fetch(`${this.baseUrl}/api/datasources`, {
-				headers: this.getHeaders()
+				headers: this.getHeaders(),
+				signal: AbortSignal.timeout(GRAFANA_REQUEST_TIMEOUT_MS)
 			});
 			if (!res.ok) throw new GeneralException(`Grafana datasources error: HTTP ${res.status}`);
 			return (await res.json()) as IGrafanaDatasource[];
 		} catch (err: unknown) {
 			if (err instanceof GeneralException) throw err;
 			throw new GeneralException(`Gagal mengambil datasources Grafana: ${(err as Error).message}`);
+		}
+	}
+
+	/** Model JSON dashboard (panel + templating) via `/api/dashboards/uid/:uid`. */
+	public async getDashboard(uid: string): Promise<Record<string, unknown>> {
+		try {
+			const res = await fetch(`${this.baseUrl}/api/dashboards/uid/${encodeURIComponent(uid)}`, {
+				headers: this.getHeaders(),
+				signal: AbortSignal.timeout(GRAFANA_REQUEST_TIMEOUT_MS)
+			});
+			if (!res.ok) throw new GeneralException(`Grafana dashboard ${uid} error: HTTP ${res.status}`);
+			const body = (await res.json()) as { dashboard?: Record<string, unknown> };
+			if (!body.dashboard) throw new GeneralException(`Dashboard ${uid} tidak memiliki model.`);
+			return body.dashboard;
+		} catch (err: unknown) {
+			if (err instanceof GeneralException) throw err;
+			throw new GeneralException(`Gagal mengambil dashboard Grafana: ${(err as Error).message}`);
+		}
+	}
+
+	/**
+	 * Menentukan UID datasource secara dinamis: UID eksplisit (mis. dari URL dashboard
+	 * program) > env override > datasource bertipe sama pertama yang lolos health check.
+	 * Hasil discovery di-cache per tipe; cache dibuang bila discovery gagal.
+	 */
+	public async resolveDatasourceUid(type: 'loki' | 'prometheus', explicitUid?: string): Promise<string> {
+		if (explicitUid) return explicitUid;
+		const configured = type === 'loki' ? this.lokiUid : this.prometheusUid;
+		if (configured) return configured;
+
+		let pending = this.discoveredUids.get(type);
+		if (!pending) {
+			pending = this.discoverHealthyDatasource(type);
+			this.discoveredUids.set(type, pending);
+			pending.catch(() => this.discoveredUids.delete(type));
+		}
+		return pending;
+	}
+
+	private async discoverHealthyDatasource(type: 'loki' | 'prometheus'): Promise<string> {
+		const candidates = (await this.listDatasources()).filter((ds) => ds.type === type);
+		// Default datasource dicoba lebih dulu.
+		candidates.sort((a, b) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)));
+		for (const ds of candidates) {
+			if (await this.isDatasourceHealthy(ds.uid)) return ds.uid;
+		}
+		throw new GeneralException(`Tidak ada datasource Grafana bertipe ${type} yang sehat.`);
+	}
+
+	private async isDatasourceHealthy(uid: string): Promise<boolean> {
+		try {
+			const res = await fetch(`${this.baseUrl}/api/datasources/uid/${uid}/health`, {
+				headers: this.getHeaders(),
+				signal: AbortSignal.timeout(GRAFANA_REQUEST_TIMEOUT_MS)
+			});
+			if (!res.ok) return false;
+			const body = (await res.json()) as { status?: string };
+			return body.status === 'OK';
+		} catch {
+			return false;
 		}
 	}
 
@@ -77,7 +152,7 @@ export class GrafanaService {
 		limit = 50,
 		customLokiUid?: string
 	): Promise<ILokiLogEntry[]> {
-		const uid = customLokiUid || this.lokiUid;
+		const uid = await this.resolveDatasourceUid('loki', customLokiUid);
 		const startNs = `${fromEpochMs}000000`;
 		const endNs = `${toEpochMs}000000`;
 		const queryParams = new URLSearchParams({
@@ -93,7 +168,8 @@ export class GrafanaService {
 		try {
 			const res = await fetch(endpoint, {
 				method: 'GET',
-				headers: this.getHeaders()
+				headers: this.getHeaders(),
+				signal: AbortSignal.timeout(GRAFANA_REQUEST_TIMEOUT_MS)
 			});
 
 			if (!res.ok) {
@@ -121,6 +197,7 @@ export class GrafanaService {
 					const tsMs = Math.floor(Number(tsNs) / 1000000);
 					logs.push({
 						timestamp: new Date(tsMs).toISOString(),
+						timestampNs: tsNs,
 						line,
 						labels
 					});
@@ -128,7 +205,7 @@ export class GrafanaService {
 			}
 
 			// Sort newest to oldest
-			logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+			logs.sort((a, b) => compareNs(b.timestampNs, a.timestampNs));
 			return logs.slice(0, limit);
 		} catch (err: unknown) {
 			if (err instanceof GeneralException) throw err;
@@ -141,7 +218,7 @@ export class GrafanaService {
 		timeEpochMs?: number,
 		customPrometheusUid?: string
 	): Promise<unknown> {
-		const uid = customPrometheusUid || this.prometheusUid;
+		const uid = await this.resolveDatasourceUid('prometheus', customPrometheusUid);
 		const queryParams = new URLSearchParams({
 			query: promql
 		});
@@ -154,7 +231,8 @@ export class GrafanaService {
 		try {
 			const res = await fetch(endpoint, {
 				method: 'GET',
-				headers: this.getHeaders()
+				headers: this.getHeaders(),
+				signal: AbortSignal.timeout(GRAFANA_REQUEST_TIMEOUT_MS)
 			});
 
 			if (!res.ok) {

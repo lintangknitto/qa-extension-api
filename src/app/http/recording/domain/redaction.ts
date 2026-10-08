@@ -43,6 +43,17 @@ const SENSITIVE_PARAM_REGEX = new RegExp(
 	'gi'
 );
 
+const BEARER_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{6,}/gi;
+// key=value, key: value, "key":"value" dengan nama key sensitif (password, token, authorization, ...).
+const SENSITIVE_PAIR_PATTERN = new RegExp(
+	`(["']?[\\w-]*(?:${SENSITIVE_KEY_PATTERN.source.slice(1, -1)})[\\w-]*["']?\\s*[:=]\\s*)("[^"]*"|'[^']*'|[^\\s,;&}]+)`,
+	'gi'
+);
+
+/** Redaksi teks bebas yang bukan milik kita (baris log server, pesan console halaman) sebelum ke AI/penyimpanan. */
+export const redactLogText = (value: string): string =>
+	redactStringValue(value.replace(BEARER_PATTERN, `$1 ${REDACTED}`).replace(SENSITIVE_PAIR_PATTERN, `$1${REDACTED}`));
+
 /**
  * Menyamarkan nilai query param sensitif tetapi mempertahankan nama param agar
  * struktur URL tetap terbaca saat debugging. Berlaku untuk URL absolut maupun

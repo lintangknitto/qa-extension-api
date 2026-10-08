@@ -97,3 +97,17 @@ export const countProgramAssociatedProjects = async (idProgram: number): Promise
 	);
 	return Number(row?.total ?? 0);
 };
+
+/** Program aktif milik project (kolom `projects.id_program` maupun relasi `project_programs`). */
+export const listProgramsForProject = async (idProject: number): Promise<Entity.IQaProgram[]> =>
+	postgresConnection.raw<Entity.IQaProgram[]>(
+		`SELECT DISTINCT prg.*
+		 FROM programs prg
+		 WHERE prg.is_active = TRUE
+		   AND (
+			prg.id_program IN (SELECT id_program FROM projects WHERE id_project = ? AND id_program IS NOT NULL)
+			OR prg.id_program IN (SELECT id_program FROM project_programs WHERE id_project = ?)
+		   )
+		 ORDER BY prg.id_program ASC`,
+		[idProject, idProject]
+	);

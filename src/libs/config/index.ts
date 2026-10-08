@@ -82,8 +82,8 @@ export const embeddingConfig = {
 export const grafanaConfig = {
 	URL: process.env.GRAFANA_URL || 'http://192.168.20.15:3800',
 	SERVICE_ACCOUNT_TOKEN: process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN || '',
-	LOKI_UID: process.env.GRAFANA_LOKI_UID || 'P8E80F9AEF21F6940',
-	PROMETHEUS_UID: process.env.GRAFANA_PROMETHEUS_UID || 'PBFA97CFB590B2093',
+	LOKI_UID: process.env.GRAFANA_LOKI_UID || '',
+	PROMETHEUS_UID: process.env.GRAFANA_PROMETHEUS_UID || '',
 	TEMPO_UID: process.env.GRAFANA_TEMPO_UID || 'efh5mi0xofqioe',
 	ALLOW_ANNOTATION: process.env.ALLOW_ANNOTATION_OPERATION === 'true',
 	ALLOW_SILENCE: process.env.ALLOW_SILENCE_OPERATION === 'true'

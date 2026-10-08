@@ -36,13 +36,19 @@ export interface IAiAnomalies {
 
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-const safeJsonParse = (value: string | null | undefined): Record<string, unknown> => {
-	if (!value) return {};
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+	Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Payload event di PostgreSQL bertipe JSONB sehingga driver `pg` mengembalikannya
+ * sebagai object; string JSON tetap didukung untuk data lama/MySQL.
+ */
+export const parseEventPayload = (value: unknown): Record<string, unknown> => {
+	if (isPlainObject(value)) return value;
+	if (typeof value !== 'string' || !value) return {};
 	try {
-		const parsed = JSON.parse(value);
-		return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-			? (parsed as Record<string, unknown>)
-			: {};
+		const parsed: unknown = JSON.parse(value);
+		return isPlainObject(parsed) ? parsed : {};
 	} catch {
 		return {};
 	}
@@ -56,7 +62,7 @@ export const parseStoredEvent = (row: Entity.IQaRecordingEvent): IAiInputEvent =
 	sequence: Number(row.sequence ?? 0),
 	occurredAt: row.occurred_at ?? null,
 	url: row.url ?? null,
-	payload: safeJsonParse(row.payload)
+	payload: parseEventPayload(row.payload)
 });
 
 const collectConsoleAnomaly = (event: IAiInputEvent, anomalies: string[]): void => {
@@ -226,8 +232,7 @@ const formatStepEvent = (event: IAiInputEvent, stepIndex: number): string | null
 
 const renderSteps = (events: IAiInputEvent[]): string => {
 	const stepEvents = events
-		.filter((event) => (event.type === 'action' || event.type === 'navigation') && !isInternalExtensionEvent(event))
-		.slice(0, 300);
+		.filter((event) => (event.type === 'action' || event.type === 'navigation') && !isInternalExtensionEvent(event));
 	if (stepEvents.length === 0) return '(tidak ada action tercatat)';
 	const lines: string[] = [];
 	let stepIndex = 1;

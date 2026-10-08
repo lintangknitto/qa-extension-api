@@ -19,10 +19,14 @@ const server = http.createServer((req, res) => {
 
 		req.on('end', () => {
 			let kind = 'markdown';
+			let userMessage = '';
 			try {
 				const parsed = JSON.parse(body);
 				const systemMessage = (parsed.messages || []).find((m) => m.role === 'system')?.content || '';
-				if (systemMessage.toLowerCase().includes('playwright')) {
+				userMessage = (parsed.messages || []).find((m) => m.role === 'user')?.content || '';
+				if (systemMessage.toLowerCase().includes('menginvestigasi')) {
+					kind = 'investigation';
+				} else if (systemMessage.toLowerCase().includes('playwright')) {
 					kind = 'playwright';
 				}
 			} catch (_) {
@@ -30,7 +34,25 @@ const server = http.createServer((req, res) => {
 			}
 
 			let content = '';
-			if (kind === 'playwright') {
+			if (kind === 'investigation') {
+				// Kutip baris log dari blok "Cuplikan" di konteks, seperti yang diminta prompt investigasi.
+				const quoted = [];
+				let inBlock = false;
+				for (const raw of userMessage.split('\n')) {
+					const line = raw.trim();
+					if (line === '```') {
+						inBlock = !inBlock;
+						continue;
+					}
+					if (inBlock && line) quoted.push(`> ${line}`);
+				}
+				content = [
+					'## Ringkasan',
+					'Mock investigasi deterministik.',
+					'## Bukti',
+					...(quoted.length > 0 ? quoted : ['Log tidak ditemukan.'])
+				].join('\n');
+			} else if (kind === 'playwright') {
 				content = [
 					"import { test, expect } from '@playwright/test';",
 					"",

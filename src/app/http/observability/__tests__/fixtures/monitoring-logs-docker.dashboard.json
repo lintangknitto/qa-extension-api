@@ -1,0 +1,126 @@
+{
+  "title": "Monitoring Logs Docker",
+  "uid": "5cb00b4e-0cd6-44a5-b6e0-361b31c966a5",
+  "templating": {
+    "list": [
+      {
+        "name": "provider",
+        "type": "query",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_arp_entries,provider)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "current": {
+          "text": "GCP",
+          "value": "GCP"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "df7y15ejvchs0a"
+        }
+      },
+      {
+        "name": "environment",
+        "type": "query",
+        "query": {
+          "label": "environment",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "",
+          "type": 1
+        },
+        "current": {
+          "text": "PRODUCTION",
+          "value": "PRODUCTION"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "${loki_ds}"
+        }
+      },
+      {
+        "name": "cabang",
+        "type": "query",
+        "query": {
+          "label": "cabang",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{environment=~\"$environment\"}",
+          "type": 1
+        },
+        "current": {
+          "text": "GCP-DATABASE",
+          "value": "GCP-DATABASE"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "${loki_ds}"
+        }
+      },
+      {
+        "name": "service",
+        "type": "query",
+        "query": {
+          "label": "service_name",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "{cabang=\"$cabang\", environment=\"$environment\"}",
+          "type": 1
+        },
+        "current": {
+          "text": "monitoring-cadvisor",
+          "value": "monitoring-cadvisor"
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "${loki_ds}"
+        }
+      },
+      {
+        "name": "search_value",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "search_value_2",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "loki_ds",
+        "type": "datasource",
+        "query": "loki",
+        "current": {
+          "text": "LOKI-GCP",
+          "value": "bff5y085q5d6oe"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "logs",
+      "title": "Tabel Logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki_ds}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki_ds}"
+          },
+          "expr": "{job=\"docker\", cabang=\"$cabang\", environment=\"$environment\", service_name=\"$service\"} |= \"$search_value\" |= \"$search_value_2\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

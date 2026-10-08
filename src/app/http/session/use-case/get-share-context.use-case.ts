@@ -113,6 +113,7 @@ export const getShareContextUseCase = async (shareToken: string) => {
 	}
 
 	const playwrightGen = generations.find((g) => g.kind === 'playwright');
+	const investigationGen = generations.find((g) => g.kind === 'investigation' && g.status === 'completed');
 
 	return {
 		session: {
@@ -122,6 +123,7 @@ export const getShareContextUseCase = async (shareToken: string) => {
 		},
 		checkpoints: checkpoints.map(sessionDomain.toCheckpointResponse),
 		playwright_script: playwrightGen?.output || null,
+		investigation_report: investigationGen?.output || null,
 		failed_requests: failedRequests,
 		network_requests: networkRequests,
 		console_logs: consoleLogs,
