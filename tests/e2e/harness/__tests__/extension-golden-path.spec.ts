@@ -312,27 +312,36 @@ describe('PostgreSQL Recorder E2E Golden Path (Checkpoints 3 & 4)', () => {
 
 		// 4.2 Artifact & Storage Snapshot di PostgreSQL dan MinIO
 		// Tunggu artifact storage_state tersimpan
-		let storageArtifact: any = null;
+		type ArtifactRow = { id_artifact: string; kind: string; object_key: string; content_type: string; size_bytes: string; status: string };
+		let artifacts: ArtifactRow[] = [];
+		const uploaded = (kind: string) => artifacts.find((r) => r.kind === kind && r.status === 'uploaded');
 		for (let i = 0; i < 15; i++) {
-			const artRows = await pool.query<{
-				id_artifact: string;
-				kind: string;
-				object_key: string;
-				content_type: string;
-			}>(
-				`SELECT id_artifact, kind, object_key, content_type 
-				 FROM recording_artifacts 
+			const artRows = await pool.query<ArtifactRow>(
+				`SELECT id_artifact, kind, object_key, content_type, size_bytes, status
+				 FROM recording_artifacts
 				 WHERE id_session = $1`,
 				[sessionId]
 			);
-			storageArtifact = artRows.rows.find((r) => r.kind === 'storage_state');
-			if (storageArtifact) break;
+			artifacts = artRows.rows;
+			if (uploaded('storage_state') && uploaded('screenshot')) break;
 			await new Promise((r) => setTimeout(r, 1000));
 		}
 
-		// Jika storage_state dibuat, verifikasi isi objek MinIO
-		if (storageArtifact) {
-			const stream = await minioClient.getObject(endpoints.minio.bucket, storageArtifact.object_key);
+		// Both artifact kinds are required (PRD success criterion 4), and each DB row must match a real MinIO object.
+		const storageArtifact = uploaded('storage_state');
+		const screenshotArtifact = uploaded('screenshot');
+		expect(storageArtifact).toBeDefined();
+		expect(screenshotArtifact).toBeDefined();
+		for (const art of [storageArtifact!, screenshotArtifact!]) {
+			const stat = await minioClient.statObject(endpoints.minio.bucket, art.object_key);
+			expect(stat.size).toBeGreaterThan(0);
+			expect(Number(art.size_bytes)).toBe(stat.size);
+			expect(String(stat.metaData?.['content-type'] ?? art.content_type)).toBe(art.content_type);
+		}
+		expect(screenshotArtifact!.content_type).toMatch(/^image\//);
+
+		{
+			const stream = await minioClient.getObject(endpoints.minio.bucket, storageArtifact!.object_key);
 			const chunks: Buffer[] = [];
 			const artifactBuffer = await new Promise<Buffer>((resolve, reject) => {
 				stream.on('data', (c) => chunks.push(c));
@@ -362,7 +371,8 @@ describe('PostgreSQL Recorder E2E Golden Path (Checkpoints 3 & 4)', () => {
 				[sessionId]
 			);
 			genRows = res.rows;
-			if (genRows.some((g) => g.status === 'completed')) break;
+			const done = (kind: string) => genRows.some((g) => g.kind === kind && g.status === 'completed');
+			if (done('markdown') && done('playwright')) break;
 			await new Promise((r) => setTimeout(r, 1000));
 		}
 

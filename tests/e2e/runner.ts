@@ -14,6 +14,8 @@ async function runE2E() {
 		'tests/e2e/harness/__tests__/disposable-stack.spec.ts',
 		'tests/e2e/harness/__tests__/migration-and-fixtures.spec.ts',
 		'tests/e2e/harness/__tests__/extension-golden-path.spec.ts',
+		// jest.config ignores tests/e2e so `pnpm test` stays a fast unit run; lift that here.
+		'--testPathIgnorePatterns=/node_modules/',
 		'--runInBand',
 		'--forceExit'
 	];
