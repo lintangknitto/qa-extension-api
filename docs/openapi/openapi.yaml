@@ -1069,6 +1069,37 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/investigate:
+    post:
+      tags: [generations]
+      summary: Investigasi kegagalan sesi (rekaman + log Loki dashboard program + codebase memory)
+      operationId: postSessionInvestigate
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Hasil generation kind investigation (status completed/failed)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/replay-failures:
+    post:
+      tags: [generations]
+      summary: Laporkan langkah replay yang gagal; investigasi berjalan di background (WS generation:*)
+      operationId: postSessionReplayFailure
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReplayFailureRequest' }
+      responses:
+        '200':
+          description: Kegagalan tercatat, investigasi dimulai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
   /projects/{id_project}/codebase/sync:
     post:
       tags: [codebase]
@@ -1427,10 +1458,25 @@ components:
         checksum_sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
     GenerateSessionRequest:
       type: object
+      description: >-
+        Tanpa `kinds` dijalankan markdown + playwright (deterministik), ditambah investigation
+        otomatis bila sesi FAIL/BLOCKED, atau sesi PASS dengan request 5xx/gagal atau replay gagal.
+        Investigation selalu berjalan di background: `results.investigation.status` bernilai
+        `started` (atau `already_running` bila sesi itu masih diinvestigasi); hasil dikirim lewat
+        WS `generation:*` dan tersimpan sebagai generation kind `investigation`.
       properties:
         kinds:
           type: array
-          items: { type: string, enum: [markdown, playwright] }
+          items: { type: string, enum: [markdown, playwright, playwright_ai, investigation] }
+    ReplayFailureRequest:
+      type: object
+      required: [step_no, error]
+      properties:
+        step_no: { type: integer, minimum: 1 }
+        error: { type: string, maxLength: 2000 }
+        step_description: { type: string, maxLength: 500 }
+        selector: { type: string, maxLength: 500 }
+        total_steps: { type: integer, minimum: 0 }
     SyncCodebaseRequest:
       type: object
       properties:

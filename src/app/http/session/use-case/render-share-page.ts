@@ -73,6 +73,9 @@ ${
 \`\`\`typescript
 ${data.playwright_script || '// Script not generated yet'}
 \`\`\`
+
+## 5. AI Investigation (server logs + code)
+${data.investigation_report || '_Investigation not generated yet._'}
 `.trim();
 
 	const safeAiPrompt = JSON.stringify(aiPromptMarkdown).replace(/</g, '\\u003c');
@@ -663,6 +666,10 @@ ${data.playwright_script || '// Script not generated yet'}
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
 							<span>Script Playwright</span>
 						</button>
+						<button class="tab-button" role="tab" id="tab-btn-investigation" aria-selected="false" aria-controls="panel-investigation" onclick="selectTab('investigation')">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+							<span>Investigasi</span>
+						</button>
 					</div>
 
 					<!-- Panel 1: Network -->
@@ -752,6 +759,11 @@ ${data.playwright_script || '// Script not generated yet'}
 						</div>
 						<pre class="code-viewer">${escapeHtml(data.playwright_script || '// Script Playwright belum digenerate untuk sesi rekaman ini.')}</pre>
 					</div>
+
+					<!-- Panel 4: Investigasi AI (markdown ditampilkan sebagai teks ter-escape) -->
+					<div id="panel-investigation" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-investigation" aria-hidden="true">
+						<pre class="code-viewer" style="white-space: pre-wrap;">${escapeHtml(data.investigation_report || 'Investigasi belum dijalankan untuk sesi ini.')}</pre>
+					</div>
 				</section>
 			</div>
 		</main>
@@ -833,7 +845,7 @@ ${data.playwright_script || '// Script not generated yet'}
 		}
 
 		function selectTab(tabId) {
-			const tabs = ['network', 'console', 'script'];
+			const tabs = ['network', 'console', 'script', 'investigation'];
 			tabs.forEach(t => {
 				const btn = document.getElementById('tab-btn-' + t);
 				const panel = document.getElementById('panel-' + t);

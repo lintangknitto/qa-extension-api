@@ -18,4 +18,19 @@ router.get(
 	requestHandler(controller.list)
 );
 
+// Investigasi manual (tombol "Investigasi"): rekaman + log Loki dashboard program + codebase memory.
+router.post(
+	'/sessions/:id_session/investigate',
+	requestValidator({ requestType: 'params', type: request.sessionGenerationParamValidation }),
+	requestHandler(controller.investigate)
+);
+
+// Laporan replay gagal dari extension; investigasi berjalan di background.
+router.post(
+	'/sessions/:id_session/replay-failures',
+	requestValidator({ requestType: 'params', type: request.sessionGenerationParamValidation }),
+	requestValidator({ requestType: 'body', type: request.replayFailureValidation }),
+	requestHandler(controller.reportReplayFailure)
+);
+
 export default router;

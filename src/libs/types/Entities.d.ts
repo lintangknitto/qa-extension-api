@@ -97,7 +97,7 @@ declare namespace Entity {
 		event_type?: string
 		tab_id?: number | null
 		url?: string | null
-		payload?: string | null
+		payload?: string | Record<string, unknown> | null
 		occurred_at?: string | null
 		created_at?: string
 	}

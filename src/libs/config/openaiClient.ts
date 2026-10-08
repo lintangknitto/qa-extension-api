@@ -60,6 +60,7 @@ export const createOpenAiCompleter = (client: OpenAI = getOpenAiClient()): IAiCo
 		const response = await client.chat.completions.create(
 			{
 				model: openAiConfig.MODEL,
+				temperature: 0,
 				max_tokens: openAiConfig.MAX_OUTPUT_TOKENS,
 				messages: [
 					{ role: 'system', content: system },
@@ -70,10 +71,13 @@ export const createOpenAiCompleter = (client: OpenAI = getOpenAiClient()): IAiCo
 		);
 
 		const choice = response.choices?.[0];
-		const message = choice?.message as
-			| (typeof choice.message & { reasoning_content?: string; reasoning?: string })
-			| undefined;
+		if (choice?.finish_reason === 'length') {
+			throw new Error(
+				'Output AI terpotong (finish_reason=length). Naikkan OPENAI_MAX_OUTPUT_TOKENS atau perkecil konteks.'
+			);
+		}
 
-		return message?.content ?? message?.reasoning_content ?? message?.reasoning ?? '';
+		// Sengaja tidak fallback ke reasoning_content: teks "pikiran" model bukan output yang valid.
+		return choice?.message?.content ?? '';
 	}
 });

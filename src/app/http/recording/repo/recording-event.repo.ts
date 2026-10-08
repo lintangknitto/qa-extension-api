@@ -33,3 +33,26 @@ export const insertEventsBatch = async (
 
 	return insertedCount;
 };
+
+/**
+ * Menyimpan event sisi server (mis. `replay_failure`) di sequence berikutnya.
+ * Konflik sequence dengan ingest paralel dicoba ulang beberapa kali.
+ */
+export const appendServerEvent = async (
+	idSession: number,
+	eventType: string,
+	payload: Record<string, unknown>
+): Promise<number> => {
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const [row] = await postgresConnection.raw<Array<{ id_event: number | string }>>(
+			`INSERT INTO recording_events (id_session, sequence, event_type, tab_id, url, payload, occurred_at, created_at)
+			 SELECT $1, COALESCE(MAX(sequence), 0) + 1, $2, NULL, NULL, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+			 FROM recording_events WHERE id_session = $1
+			 ON CONFLICT (id_session, sequence) DO NOTHING
+			 RETURNING id_event`,
+			[idSession, eventType, JSON.stringify(payload)]
+		);
+		if (row) return Number(row.id_event);
+	}
+	throw new Error('Gagal menyimpan event: konflik sequence berulang.');
+};

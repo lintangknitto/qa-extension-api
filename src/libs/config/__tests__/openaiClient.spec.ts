@@ -7,18 +7,28 @@ import {
 } from '../openaiClient';
 
 const fakeOpenAi = (
-	messagePayload: { content?: string | null; reasoning?: string; reasoning_content?: string } | null
+	messagePayload: {
+		content?: string | null;
+		reasoning?: string;
+		reasoning_content?: string;
+	} | null,
+	finishReason = 'stop',
+	onCreate?: (body: Record<string, unknown>) => void
 ): OpenAI =>
 	({
 		chat: {
 			completions: {
-				create: async () => ({
-					choices: [
-						{
-							message: messagePayload ?? { content: null }
-						}
-					]
-				})
+				create: async (body: Record<string, unknown>) => {
+					onCreate?.(body);
+					return {
+						choices: [
+							{
+								message: messagePayload ?? { content: null },
+								finish_reason: finishReason
+							}
+						]
+					};
+				}
 			}
 		}
 	}) as unknown as OpenAI;
@@ -26,7 +36,9 @@ const fakeOpenAi = (
 describe('openaiClient', () => {
 	it('mengembalikan konten dari provider OpenAI-compatible', async () => {
 		const completer = createOpenAiCompleter(fakeOpenAi({ content: 'hasil ringkasan' }));
-		await expect(completer.complete({ system: 's', user: 'u' })).resolves.toBe('hasil ringkasan');
+		await expect(completer.complete({ system: 's', user: 'u' })).resolves.toBe(
+			'hasil ringkasan'
+		);
 	});
 
 	it('mengembalikan string kosong bila provider tidak memberi konten', async () => {
@@ -34,20 +46,29 @@ describe('openaiClient', () => {
 		await expect(completer.complete({ system: 's', user: 'u' })).resolves.toBe('');
 	});
 
-	it('fallback ke reasoning atau reasoning_content jika content kosong', async () => {
-		const completerReasoning = createOpenAiCompleter(
-			fakeOpenAi({ content: null, reasoning: 'alasan analisis' })
+	it('tidak fallback ke reasoning/reasoning_content saat content kosong', async () => {
+		const completer = createOpenAiCompleter(
+			fakeOpenAi({
+				content: null,
+				reasoning: 'alasan analisis',
+				reasoning_content: 'alasan deepseek'
+			})
 		);
-		await expect(completerReasoning.complete({ system: 's', user: 'u' })).resolves.toBe(
-			'alasan analisis'
-		);
+		await expect(completer.complete({ system: 's', user: 'u' })).resolves.toBe('');
+	});
 
-		const completerReasoningContent = createOpenAiCompleter(
-			fakeOpenAi({ content: null, reasoning_content: 'alasan deepseek' })
+	it('melempar error saat output terpotong (finish_reason=length)', async () => {
+		const completer = createOpenAiCompleter(fakeOpenAi({ content: 'setengah' }, 'length'));
+		await expect(completer.complete({ system: 's', user: 'u' })).rejects.toThrow(/terpotong/);
+	});
+
+	it('mengirim temperature 0 agar output stabil', async () => {
+		let sent: Record<string, unknown> = {};
+		const completer = createOpenAiCompleter(
+			fakeOpenAi({ content: 'ok' }, 'stop', (b) => (sent = b))
 		);
-		await expect(completerReasoningContent.complete({ system: 's', user: 'u' })).resolves.toBe(
-			'alasan deepseek'
-		);
+		await completer.complete({ system: 's', user: 'u' });
+		expect(sent.temperature).toBe(0);
 	});
 
 	it('sanitizeAiResponseText memotong trailing data: [DONE]', () => {

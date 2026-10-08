@@ -22,12 +22,16 @@ describe('ai-generation', () => {
 	});
 
 	describe('buildSystemPrompt', () => {
-		it('mengembalikan prompt berbeda per kind dan tidak kosong', () => {
+		it('mengembalikan prompt berbeda untuk kind AI dan tidak kosong', () => {
 			const markdown = buildSystemPrompt('markdown');
-			const playwright = buildSystemPrompt('playwright');
+			const patch = buildSystemPrompt('playwright_ai');
 			expect(markdown.length).toBeGreaterThan(0);
-			expect(playwright.length).toBeGreaterThan(0);
-			expect(markdown).not.toBe(playwright);
+			expect(patch).toContain('patches');
+			expect(markdown).not.toBe(patch);
+		});
+
+		it('menolak kind non-AI (playwright dibuat deterministik)', () => {
+			expect(() => buildSystemPrompt('playwright')).toThrow(InvalidParameterException);
 		});
 	});
 

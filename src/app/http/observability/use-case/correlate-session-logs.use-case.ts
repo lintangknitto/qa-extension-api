@@ -104,7 +104,7 @@ const extractErrorsFromEvents = (
 	return { recordingErrors, searchKeywords };
 };
 
-const findMatchingCodeContext = async (
+export const findMatchingCodeContext = async (
 	idProject: number,
 	keywords: string[]
 ): Promise<ICorrelateSessionResult['matched_code_context']> => {

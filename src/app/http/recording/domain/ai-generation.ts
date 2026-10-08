@@ -1,7 +1,17 @@
 import { InvalidParameterException } from '@knittotextile/knitto-core-backend/dist/CoreException';
+import { AI_PATCH_SYSTEM_PROMPT } from './ai-patch';
 
-export const GENERATION_KINDS = ['markdown', 'playwright'] as const;
+/**
+ * - markdown: laporan QA (AI)
+ * - playwright: script deterministik dari event (tanpa AI)
+ * - playwright_ai: patch AI kecil (value/komentar) di atas script deterministik (opsional)
+ * - investigation: analisis akar masalah dari rekaman + log Loki dashboard program + codebase memory
+ */
+export const GENERATION_KINDS = ['markdown', 'playwright', 'playwright_ai', 'investigation'] as const;
 export type TGenerationKind = (typeof GENERATION_KINDS)[number];
+
+/** Kind yang dijalankan saat request tidak menyebut `kinds`. */
+export const DEFAULT_GENERATION_KINDS: readonly TGenerationKind[] = ['markdown', 'playwright'];
 
 export const GENERATION_STATUS = {
 	PENDING: 'pending',
@@ -21,7 +31,7 @@ export const assertGenerationKind = (kind: string): TGenerationKind => {
 	return kind;
 };
 
-const SYSTEM_PROMPTS: Record<TGenerationKind, string> = {
+const SYSTEM_PROMPTS: Partial<Record<TGenerationKind, string>> = {
 	markdown: [
 		'Kamu asisten QA senior. Buat ringkasan hasil pengujian dan laporan investigasi debugging yang komprehensif dalam Bahasa Indonesia berformat Markdown.',
 		'Sertakan: Identitas Test Case, Status Hasil (PASS/FAIL/BLOCKED), Ringkasan Langkah Pengujian, Checkpoint & Verifikasi, Anomali Console/Network jika ada, serta Rekomendasi/Catatan QA.',
@@ -30,30 +40,21 @@ const SYSTEM_PROMPTS: Record<TGenerationKind, string> = {
 		'Jangan menampilkan kembali nilai sensitif jika terredaksi.',
 		'Balas hanya konten Markdown tanpa penjelasan pembuka/penutup.'
 	].join(' '),
-	playwright: [
-		'Kamu adalah QA Automation Engineer handal yang mengonversi rekaman interaksi tester menjadi skrip otomasi Playwright (TypeScript, @playwright/test) yang 100% executable dan akurat mereplikasi gerakan tester.',
-		'ATURAN UTAMA:',
-		'1. Buat test lengkap: import { test, expect } from "@playwright/test"; test("...", async ({ page }) => { ... });',
-		'2. Buka URL target di awal dengan `await page.goto(...)` sesuai Target URL Frontend Aktual atau event navigasi web pertama. JANGAN PERNAH membuka URL API backend (seperti endpoint REST/domain yang diawali api-) karena browser sedang menguji UI frontend.',
-		'3. Ikuti urutan langkah tester secara kronologis dan presisi 1:1. Gunakan `Primary Locator` yang tercantum di setiap langkah.',
-		'4. Gunakan Playwright locators standar: page.getByTestId(), page.getByRole(), page.getByLabel(), page.getByPlaceholder(), page.getByText(), atau page.locator().',
-		'5. Prioritaskan locator semantik (getByRole, getByPlaceholder, getByTestId, getByLabel) daripada selector CSS path turunan (seperti div > svg > path) jika tombol/elemen interaktif induknya teridentifikasi.',
-		'6. Untuk aksi input/ketik, gunakan `await ...fill("...")`. Jika terdapat event [INPUT] dan [CHANGE] berturut-turut pada elemen yang sama dengan nilai yang sama, gabungkan menjadi satu pemanggilan `.fill(...)`.',
-		'7. Untuk aksi tombol keyboard [KEYDOWN], gunakan `await ...press("Key")` (contoh: .press("Enter")).',
-		'8. Untuk SETIAP aksi klik [CLICK], WAJIB tuliskan `await ...click();` secara utuh. Jangan pernah melewatkan klik tombol (seperti tombol kirim, simpan, ikon, menu, atau button submit).',
-		'9. Untuk aksi dropdown/select, gunakan `await ...selectOption("...")`.',
-		'10. Untuk aksi centang/checkbox, gunakan `await ...check()` atau `await ...uncheck()`.',
-		'11. Sertakan assertion `await expect(...)` yang bermakna pada titik-titik penting, checkpoint tester, dan verifikasi akhir (misal: verifikasi form kosong/terisi, status pesan, URL stabil).',
-		'12. JANGAN PERNAH menyertakan klik atau interaksi pada widget internal tester (seperti #qa-knitto-fab-host atau overlay perekam).',
-		'13. Tulis setiap baris aksi Playwright dalam satu baris utuh (single-line) yang jelas, misalnya `await page.getByRole("button", { name: "Kirim" }).click();` alih-alih memecahnya menjadi banyak baris.',
-		'14. Pastikan semua alur interaksi tester, termasuk pengetikan pesan, penekanan tombol Enter [KEYDOWN], dan klik tombol kirim/submit [CLICK] ditulis secara lengkap dan tuntas dari awal hingga akhir.',
-		'15. JANGAN membuat asumsi atau menebak-nebak selector generic jika locator sudah disediakan secara jelas pada data langkah.',
-		'16. JANGAN menuliskan komentar spekulatif seperti "// Asumsi: ...". Tulis kode nyata yang siap dieksekusi langsung oleh runner Playwright maupun Replay Engine di browser.',
-		'17. Balas HANYA kode TypeScript murni tanpa markdown code block / explanation pembuka.'
+	playwright_ai: AI_PATCH_SYSTEM_PROMPT,
+	investigation: [
+		'Kamu QA engineer senior yang menginvestigasi kegagalan pengujian. Tulis laporan Markdown Bahasa Indonesia berdasarkan konteks: sinyal kegagalan rekaman, log server Loki, dan potongan kode.',
+		'Struktur: ## Ringkasan, ## Dugaan Akar Masalah (sebut komponen: frontend/backend/data/infra/test), ## Bukti (kutip baris log persis beserta timestamp & requestId bila ada, dan nomor event rekaman), ## Langkah Tester Terkait, ## Rekomendasi.',
+		'Hanya pakai fakta dari konteks. Bila log tidak ditemukan atau query gagal, katakan terus terang dan sebutkan apa yang perlu dicek manual; jangan mengarang isi log.',
+		'Bila tingkat keyakinan rendah, nyatakan demikian. Jangan menampilkan nilai sensitif/terredaksi.',
+		'Balas hanya konten Markdown tanpa pembuka/penutup.'
 	].join(' ')
 };
 
-export const buildSystemPrompt = (kind: TGenerationKind): string => SYSTEM_PROMPTS[kind];
+export const buildSystemPrompt = (kind: TGenerationKind): string => {
+	const prompt = SYSTEM_PROMPTS[kind];
+	if (!prompt) throw new InvalidParameterException(`Generation ${kind} tidak memakai AI.`);
+	return prompt;
+};
 
 /**
  * Membersihkan output AI: membuang code fence untuk draft Playwright dan

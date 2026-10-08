@@ -1,5 +1,11 @@
 import { TRequestFunction } from '@knittotextile/knitto-http';
-import type { TGenerateSessionValidation, TSessionGenerationParamValidation } from './generation.request';
+import type {
+	TGenerateSessionValidation,
+	TReplayFailureValidation,
+	TSessionGenerationParamValidation
+} from './generation.request';
+import { investigateSessionUseCase } from './use-case/investigate-session.use-case';
+import { reportReplayFailureUseCase } from './use-case/report-replay-failure.use-case';
 import {
 	generateSessionOutputsUseCase,
 	listGenerationsUseCase
@@ -27,7 +33,30 @@ const list: TRequestFunction = async (req) => {
 	return { result };
 };
 
+const investigate: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionGenerationParamValidation;
+	const result = await investigateSessionUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level
+	});
+	return { result };
+};
+
+const reportReplayFailure: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionGenerationParamValidation;
+	const result = await reportReplayFailureUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input: req.body as TReplayFailureValidation
+	});
+	return { result };
+};
+
 export default {
 	generate,
-	list
+	list,
+	investigate,
+	reportReplayFailure
 };

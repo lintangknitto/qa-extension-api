@@ -111,6 +111,11 @@ describe('ai-input', () => {
 			expect(result.payload).toEqual({ a: 1 });
 		});
 
+		it('menerima payload JSONB yang sudah berupa object dari driver pg', () => {
+			const payload = { action: 'click', locators: ["getByRole('button', { name: 'Kirim' })"] };
+			expect(parseStoredEvent({ event_type: 'action', sequence: 1, payload }).payload).toEqual(payload);
+		});
+
 		it('mengembalikan object kosong untuk payload rusak', () => {
 			expect(parseStoredEvent({ event_type: 'action', sequence: 1, payload: 'bukan-json' }).payload).toEqual({});
 			expect(parseStoredEvent({ event_type: 'action', sequence: 1, payload: null }).payload).toEqual({});
