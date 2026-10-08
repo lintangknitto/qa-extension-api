@@ -71,6 +71,7 @@
 		"@scalar/express-api-reference": "~0.8.48",
 		"bcryptjs": "~2.4.3",
 		"dotenv": "~16.4.5",
+		"exceljs": "4.4.0",
 		"jsonwebtoken": "~9.0.3",
 		"minio": "^8.0.7",
 		"module-alias": "~2.2.3",

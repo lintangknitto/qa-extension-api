@@ -1,6 +1,7 @@
 import { Router, requestHandler, requestValidator } from '@knittotextile/knitto-http';
 import controller from './test-case.controller';
-import request from './test-case.request';
+import request, { type TExportTestCasesValidation, type TProjectParamValidation } from './test-case.request';
+import { exportTestCasesUseCase } from './use-case/export-test-cases.use-case';
 
 const router = Router();
 
@@ -26,6 +27,32 @@ router.post(
 	requestValidator({ requestType: 'params', type: request.projectParamValidation }),
 	requestValidator({ requestType: 'body', type: request.importTestCasesValidation }),
 	requestHandler(controller.importBulk)
+);
+
+// 3b. Ekspor .xlsx berformat template (default bila ?template tidak diberikan); harus sebelum :id_test_case
+router.get(
+	'/projects/:id_project/test-cases/export',
+	requestValidator({ requestType: 'params', type: request.projectParamValidation }),
+	requestValidator({ requestType: 'query', type: request.exportTestCasesValidation }),
+	async (req, res, next) => {
+		try {
+			const params = req.params as unknown as TProjectParamValidation;
+			const query = req.query as unknown as TExportTestCasesValidation;
+			const file = await exportTestCasesUseCase({
+				idProject: params.id_project,
+				idTemplate: query.template,
+				userId: req.userId,
+				userLevel: req.userData?.level
+			});
+			res.setHeader('Content-Type', file.contentType);
+			res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+			res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+			res.setHeader('Content-Length', file.buffer.length);
+			res.end(file.buffer);
+		} catch (err) {
+			next(err);
+		}
+	}
 );
 
 // 4. Detail test case

@@ -19,6 +19,8 @@ tags:
     description: Master project QA.
   - name: test-cases
     description: Test case per project.
+  - name: test-case-templates
+    description: Registry template spreadsheet test case (format V4, V5, ...).
   - name: sessions
     description: Sesi recording QA.
   - name: artifacts
@@ -42,6 +44,7 @@ x-tagGroups:
       - programs
       - projects
       - test-cases
+      - test-case-templates
       - sessions
       - artifacts
       - generations
@@ -518,6 +521,45 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/test-cases/export:
+    get:
+      tags: [test-cases]
+      summary: Ekspor test case ke .xlsx berformat template
+      description: >-
+        Mengunduh tab template terdaftar (default bila `template` kosong) dari Google Sheets, mengisi metadata
+        header, blok PB, dan baris test case, lalu memperlebar rumus Summary serta dropdown ke semua baris.
+        User non-admin hanya bisa mengekspor project yang di-assign (atau semua bila tidak punya assignment).
+      operationId: getProjectTestCaseExport
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: template
+          in: query
+          description: ID template test case; kosong = template default.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: File xlsx (`<project-code>-test-case-<versi>.xlsx`)
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: 'attachment; filename="chat-widget-test-case-v4.xlsx"' }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '400':
+          description: Template nonaktif atau spreadsheet template tidak bisa diunduh
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoErrorEnvelope' }
+        '403':
+          description: Tidak punya akses ke project
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoErrorEnvelope' }
+        '404':
+          description: Project atau template tidak ditemukan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoErrorEnvelope' }
   /projects/{id_project}/test-cases/{id_test_case}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -557,6 +599,118 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /test-case-templates:
+    get:
+      tags: [test-case-templates]
+      summary: Daftar template test case
+      description: Semua user login melihat template aktif. `include_inactive=true` hanya berlaku untuk ADMIN/SUPERADMIN.
+      operationId: getTestCaseTemplates
+      parameters:
+        - name: include_inactive
+          in: query
+          schema: { type: string, enum: ['true', 'false'] }
+      responses:
+        '200':
+          description: Daftar template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [test-case-templates]
+      summary: Daftarkan template baru (ADMIN/SUPERADMIN)
+      operationId: postTestCaseTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTestCaseTemplateRequest' }
+      responses:
+        '201':
+          description: Template berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+        '403':
+          description: Bukan ADMIN/SUPERADMIN
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoErrorEnvelope' }
+  /test-case-templates/default:
+    get:
+      tags: [test-case-templates]
+      summary: Template default (dipakai "Template Sistem" & ekspor)
+      operationId: getDefaultTestCaseTemplate
+      responses:
+        '200':
+          description: Template default
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+        '404':
+          description: Belum ada template default
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoErrorEnvelope' }
+  /test-case-templates/{id_template}:
+    parameters:
+      - $ref: '#/components/parameters/TemplateId'
+    get:
+      tags: [test-case-templates]
+      summary: Detail template (ADMIN/SUPERADMIN)
+      operationId: getTestCaseTemplate
+      responses:
+        '200':
+          description: Detail template
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    put:
+      tags: [test-case-templates]
+      summary: Ubah template (ADMIN/SUPERADMIN)
+      description: Template default tidak bisa dinonaktifkan lewat `is_active=false`.
+      operationId: putTestCaseTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateTestCaseTemplateRequest' }
+      responses:
+        '200':
+          description: Template berhasil diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /test-case-templates/{id_template}/default:
+    parameters:
+      - $ref: '#/components/parameters/TemplateId'
+    patch:
+      tags: [test-case-templates]
+      summary: Jadikan template default (ADMIN/SUPERADMIN)
+      operationId: patchTestCaseTemplateDefault
+      responses:
+        '200':
+          description: Template menjadi default; default lama dilepas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /test-case-templates/{id_template}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/TemplateId'
+    patch:
+      tags: [test-case-templates]
+      summary: Nonaktifkan template (ADMIN/SUPERADMIN)
+      operationId: patchTestCaseTemplateDeactivate
+      responses:
+        '200':
+          description: Template dinonaktifkan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+        '400':
+          description: Template default tidak bisa dinonaktifkan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoErrorEnvelope' }
   /sessions:
     get:
       tags: [sessions]
@@ -1235,6 +1389,11 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    TemplateId:
+      name: id_template
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
     TestCaseId:
       name: id_test_case
       in: path
@@ -1369,6 +1528,16 @@ components:
         base_url: { type: string, maxLength: 500 }
         repo_url: { type: string, maxLength: 500 }
         is_active: { type: boolean }
+        release_version: { type: string, nullable: true, maxLength: 100 }
+        test_app_folder: { type: string, nullable: true, maxLength: 255 }
+        ip_dev: { type: string, nullable: true, maxLength: 100 }
+        ip_prod: { type: string, nullable: true, maxLength: 100 }
+        tester_name: { type: string, nullable: true, maxLength: 150 }
+        programmer_name: { type: string, nullable: true, maxLength: 150 }
+        task_dev: { type: string, nullable: true, maxLength: 255 }
+        brd_id: { type: string, nullable: true, maxLength: 100 }
+        link_task_pb: { type: string, nullable: true, maxLength: 500 }
+        link_figma: { type: string, nullable: true, maxLength: 500 }
     UpdateProjectRequest:
       type: object
       properties:
@@ -1381,6 +1550,16 @@ components:
         base_url: { type: string, maxLength: 500 }
         repo_url: { type: string, maxLength: 500 }
         is_active: { type: boolean }
+        release_version: { type: string, nullable: true, maxLength: 100 }
+        test_app_folder: { type: string, nullable: true, maxLength: 255 }
+        ip_dev: { type: string, nullable: true, maxLength: 100 }
+        ip_prod: { type: string, nullable: true, maxLength: 100 }
+        tester_name: { type: string, nullable: true, maxLength: 150 }
+        programmer_name: { type: string, nullable: true, maxLength: 150 }
+        task_dev: { type: string, nullable: true, maxLength: 255 }
+        brd_id: { type: string, nullable: true, maxLength: 100 }
+        link_task_pb: { type: string, nullable: true, maxLength: 500 }
+        link_figma: { type: string, nullable: true, maxLength: 500 }
     TestCaseFields:
       type: object
       properties:
@@ -1392,6 +1571,7 @@ components:
         process_no: { type: string, maxLength: 50 }
         test_type: { type: string, maxLength: 10 }
         test_variable: { type: string, maxLength: 255 }
+        scenario: { type: string, description: Kolom Scenario format V4 }
         pre_condition: { type: string }
         test_data: { type: string }
         test_steps: { type: string }
@@ -1401,6 +1581,7 @@ components:
         evidence: { type: string }
         remarks: { type: string }
         automation_tools: { type: string, maxLength: 100 }
+        test_date: { type: string, maxLength: 50, description: Kolom Date format V4 (disimpan apa adanya) }
     TestCaseWriteRequest:
       allOf:
         - $ref: '#/components/schemas/TestCaseFields'
@@ -1408,6 +1589,68 @@ components:
           required: [test_case_id, title]
     UpdateTestCaseRequest:
       $ref: '#/components/schemas/TestCaseFields'
+    TemplateColumnMapping:
+      type: object
+      description: Pemetaan field sistem ke header kolom spreadsheet. Wajib memuat `test_case_id` dan `title`.
+      required: [test_case_id, title]
+      additionalProperties: false
+      properties:
+        group_no: { $ref: '#/components/schemas/TemplateColumn' }
+        feature: { $ref: '#/components/schemas/TemplateColumn' }
+        process_no: { $ref: '#/components/schemas/TemplateColumn' }
+        test_type: { $ref: '#/components/schemas/TemplateColumn' }
+        test_case_id: { $ref: '#/components/schemas/TemplateColumn' }
+        test_variable: { $ref: '#/components/schemas/TemplateColumn' }
+        scenario: { $ref: '#/components/schemas/TemplateColumn' }
+        title: { $ref: '#/components/schemas/TemplateColumn' }
+        pre_condition: { $ref: '#/components/schemas/TemplateColumn' }
+        test_data: { $ref: '#/components/schemas/TemplateColumn' }
+        test_steps: { $ref: '#/components/schemas/TemplateColumn' }
+        expected_result: { $ref: '#/components/schemas/TemplateColumn' }
+        status: { $ref: '#/components/schemas/TemplateColumn' }
+        evidence: { $ref: '#/components/schemas/TemplateColumn' }
+        remarks: { $ref: '#/components/schemas/TemplateColumn' }
+        automation_tools: { $ref: '#/components/schemas/TemplateColumn' }
+        test_date: { $ref: '#/components/schemas/TemplateColumn' }
+    TemplateColumn:
+      type: object
+      required: [header]
+      properties:
+        header: { type: string, minLength: 1, maxLength: 150 }
+        aliases:
+          type: array
+          items: { type: string, maxLength: 150 }
+    TemplateExportAnchors:
+      type: object
+      description: Anchor ekspor (sel metadata, baris header/data, sel blok PB). Lihat seed V4.
+      additionalProperties: true
+      example:
+        sheet_name: FORMAT TEST CASE V4
+        metadata: { release_version: B1, tester_name: F1, created_at: J1, updated_at: J2 }
+        header_row: 18
+        data_start_row: 19
+        pb_block: { title_cell: A12, spec_start_row: 13, spec_end_row: 16, brd_id_cell: A17, link_task_cell: B17, link_figma_cell: R17 }
+    CreateTestCaseTemplateRequest:
+      type: object
+      required: [version_label, name, spreadsheet_url, column_mapping]
+      properties:
+        version_label: { type: string, minLength: 1, maxLength: 30 }
+        name: { type: string, minLength: 3, maxLength: 150 }
+        spreadsheet_url: { type: string, maxLength: 500, pattern: '^https://docs\.google\.com/spreadsheets/d/' }
+        gid: { type: string, nullable: true, maxLength: 30, pattern: '^\d*$' }
+        column_mapping: { $ref: '#/components/schemas/TemplateColumnMapping' }
+        export_anchors: { $ref: '#/components/schemas/TemplateExportAnchors' }
+        is_default: { type: boolean }
+    UpdateTestCaseTemplateRequest:
+      type: object
+      properties:
+        version_label: { type: string, minLength: 1, maxLength: 30 }
+        name: { type: string, minLength: 3, maxLength: 150 }
+        spreadsheet_url: { type: string, maxLength: 500, pattern: '^https://docs\.google\.com/spreadsheets/d/' }
+        gid: { type: string, nullable: true, maxLength: 30, pattern: '^\d*$' }
+        column_mapping: { $ref: '#/components/schemas/TemplateColumnMapping' }
+        export_anchors: { $ref: '#/components/schemas/TemplateExportAnchors' }
+        is_active: { type: boolean }
     CreateSessionRequest:
       type: object
       required: [test_case_no, title]

@@ -16,12 +16,14 @@ export const insertTestCase = async (
 			test_case_id, test_variable, title, pre_condition,
 			test_data, test_steps, expected_result, actual_result,
 			status, evidence, remarks, automation_tools, created_by_user_id,
+			scenario, test_date,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8, $9, $10,
 			$11, $12, $13, $14,
 			$15, $16, $17, $18, $19,
+			$20, $21,
 			CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 		)
 		RETURNING id_test_case`,
@@ -44,7 +46,9 @@ export const insertTestCase = async (
 			orNull(data.evidence),
 			orNull(data.remarks),
 			orNull(data.automation_tools),
-			orNull(userId)
+			orNull(userId),
+			orNull(data.scenario),
+			orNull(data.test_date)
 		]
 	);
 
@@ -65,6 +69,7 @@ const buildUpdateFields = (
 		['test_type', 'test_type', (v) => normalizeTestType(v as string)],
 		['test_case_id', 'test_case_id', (v) => (v as string).trim()],
 		['test_variable', 'test_variable'],
+		['scenario', 'scenario'],
 		['title', 'title', (v) => (v as string).trim()],
 		['pre_condition', 'pre_condition'],
 		['test_data', 'test_data'],
@@ -74,7 +79,8 @@ const buildUpdateFields = (
 		['status', 'status', (v) => normalizeTestCaseStatus(v as string)],
 		['evidence', 'evidence'],
 		['remarks', 'remarks'],
-		['automation_tools', 'automation_tools']
+		['automation_tools', 'automation_tools'],
+		['test_date', 'test_date']
 	];
 
 	for (const [key, col, transform] of fields) {
