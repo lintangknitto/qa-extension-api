@@ -11,8 +11,49 @@ describe('DisposableStack Lifecycle & Safety Guard', () => {
 		}).toThrow(/SAFETY GUARD VIOLATION: Dilarang menghubungkan E2E harness ke database persisten knitto_qa/);
 	});
 
+	it('menolak knitto_qa tanpa memandang huruf besar/kecil dan nama DB tanpa prefix e2e_', () => {
+		expect(() => new DisposableStack({ postgresDb: 'KNITTO_QA' })).toThrow(/knitto_qa/);
+		expect(() => new DisposableStack({ postgresDb: 'postgres' })).toThrow(/berawalan "e2e_"/);
+	});
+
+	it('menolak projectName yang bukan milik harness (mis. project compose persisten)', () => {
+		expect(() => new DisposableStack({ projectName: 'dev-infra' })).toThrow(/projectName/);
+		expect(() => new DisposableStack({ projectName: 'knitto-e2e-x"; rm -rf /' })).toThrow(/projectName/);
+	});
+
+	it('mengabaikan override E2E_* dari environment shell dan selalu memakai port dinamis', () => {
+		const saved = { port: process.env.E2E_POSTGRES_PORT, db: process.env.E2E_POSTGRES_DB };
+		process.env.E2E_POSTGRES_PORT = '5432';
+		process.env.E2E_POSTGRES_DB = 'knitto_qa';
+		try {
+			const env = (new DisposableStack() as unknown as { env: NodeJS.ProcessEnv }).env;
+			expect(env.E2E_POSTGRES_PORT).toBe('0');
+			expect(env.E2E_POSTGRES_DB).toMatch(/^e2e_db_/);
+		} finally {
+			if (saved.port === undefined) delete process.env.E2E_POSTGRES_PORT;
+			else process.env.E2E_POSTGRES_PORT = saved.port;
+			if (saved.db === undefined) delete process.env.E2E_POSTGRES_DB;
+			else process.env.E2E_POSTGRES_DB = saved.db;
+		}
+	});
+
+	it('menjalankan down -v saat docker compose up gagal', async () => {
+		const stack = new DisposableStack();
+		const internals = stack as unknown as { compose: () => string; isStarted: boolean };
+		jest.spyOn(internals, 'compose').mockImplementationOnce(() => {
+			throw new Error('up --wait gagal (simulasi)');
+		});
+		const stopSync = jest.spyOn(stack, 'stopSync').mockImplementation(() => {
+			internals.isStarted = false;
+		});
+
+		await expect(stack.start()).rejects.toThrow('up --wait gagal');
+		expect(stopSync).toHaveBeenCalledTimes(1);
+		expect(internals.isStarted).toBe(false);
+	});
+
 	it('menolak port 5432 pada localhost', () => {
-		const stack = new DisposableStack({ postgresDb: 'safe_test_db' });
+		const stack = new DisposableStack({ postgresDb: 'e2e_safe_test_db' });
 		expect(() => {
 			stack.assertSafety({ postgresPort: 5432, postgresHost: '127.0.0.1' });
 		}).toThrow(/SAFETY GUARD VIOLATION: Dilarang memakai port default PostgreSQL persisten 5432/);

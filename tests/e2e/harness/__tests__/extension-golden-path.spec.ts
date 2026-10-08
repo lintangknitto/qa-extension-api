@@ -357,7 +357,8 @@ describe('PostgreSQL Recorder E2E Golden Path (Checkpoints 3 & 4)', () => {
 		}
 
 		// 4.3 AI Output Assertions di PostgreSQL
-		// Trigger generate jika belum ter-trigger otomatis
+		// Generation must be triggered by the extension when the session ends (ISSUES 4.3) — there is
+		// deliberately no API fallback here, so a broken UI trigger fails this test instead of hiding.
 		let genRows: any[] = [];
 		for (let i = 0; i < 20; i++) {
 			const res = await pool.query<{
@@ -374,33 +375,6 @@ describe('PostgreSQL Recorder E2E Golden Path (Checkpoints 3 & 4)', () => {
 			const done = (kind: string) => genRows.some((g) => g.kind === kind && g.status === 'completed');
 			if (done('markdown') && done('playwright')) break;
 			await new Promise((r) => setTimeout(r, 1000));
-		}
-
-		// Jika generasi belum dipicu oleh browser, pemicuan manual lewat backend endpoint
-		if (genRows.length === 0) {
-			// Trigger via API endpoint
-			const loginRes = await fetch(`${backend.baseUrl}/auth/login`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username: seeded.user.username, password: seeded.user.passwordPlain })
-			});
-			const authData = (await loginRes.json()) as any;
-			const token = authData.result.token;
-
-			await fetch(`${backend.baseUrl}/sessions/${sessionId}/generate`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${token}`
-				},
-				body: JSON.stringify({ kinds: ['markdown', 'playwright'] })
-			});
-
-			const updatedGen = await pool.query<{ kind: string; status: string; output: string }>(
-				`SELECT kind, status, output FROM recording_generations WHERE id_session = $1`,
-				[sessionId]
-			);
-			genRows = updatedGen.rows;
 		}
 
 		expect(genRows.length).toBeGreaterThan(0);
