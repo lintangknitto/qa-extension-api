@@ -7,6 +7,9 @@ export const renderShareHtml = async (shareToken: string, hostUrl?: string): Pro
 	const safeJson = JSON.stringify(data).replace(/</g, '\\u003c');
 	const baseUrl = hostUrl || 'http://127.0.0.1:8010';
 	const aiContextEndpoint = `${baseUrl}/api/v1/sessions/share/${shareToken}/ai-context`;
+	// Video lewat API (diotorisasi share token): URL presigned MinIO menunjuk host internal/127.0.0.1
+	// sehingga tidak bisa diputar dari komputer lain, dan kedaluwarsa setelah 7 hari.
+	const videoSrc = `${baseUrl}/share/${encodeURIComponent(shareToken)}/video`;
 
 	const statusColor =
 		s.result === 'PASS'
@@ -601,7 +604,7 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 						</h2>
 						${
 	s.video_url
-		? `<a href="${escapeHtml(s.video_url)}" target="_blank" rel="noreferrer" style="font-size: 11px; color: var(--primary); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+		? `<a href="${escapeHtml(videoSrc)}" target="_blank" rel="noreferrer" style="font-size: 11px; color: var(--primary); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 4px;">
 									<span>Buka Tab Baru</span>
 									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
 								   </a>`
@@ -611,7 +614,7 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 					${
 	s.video_url
 		? `<div class="video-box">
-								<video src="${escapeHtml(s.video_url)}" controls preload="metadata"></video>
+								<video src="${escapeHtml(videoSrc)}" controls preload="metadata"></video>
 							   </div>`
 		: `<div class="video-empty">
 								<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" x2="23" y1="1" y2="23"/><path d="M21 15.554v-.004a2 2 0 0 0-.57-1.428L16 10l-4.5 4.5"/><path d="M16 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.414A2 2 0 0 1 3.586 6L7 2.586A2 2 0 0 1 8.414 2H14a2 2 0 0 1 2 2v2"/></svg>

@@ -65,6 +65,14 @@ export const getArtifactObjectStream = (
 	client: Client = getMinioClient()
 ): Promise<NodeJS.ReadableStream> => client.getObject(minioConfig.BUCKET, objectKey);
 
+/** Potongan byte objek (untuk HTTP Range: seek video tanpa mengunduh seluruh file). */
+export const getArtifactObjectRange = (
+	objectKey: string,
+	offset: number,
+	length: number,
+	client: Client = getMinioClient()
+): Promise<NodeJS.ReadableStream> => client.getPartialObject(minioConfig.BUCKET, objectKey, offset, length);
+
 export const putArtifactObjectBuffer = async (
 	objectKey: string,
 	buffer: Buffer,

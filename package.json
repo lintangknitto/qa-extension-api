@@ -35,6 +35,7 @@
 		"db:migrate": "tsx scripts/migrate.ts",
 		"db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
 		"db:inspect-recordings": "tsx scripts/check-latest-session.ts",
+		"db:regenerate-video-urls": "tsx scripts/regenerate-video-urls.ts",
 		"index:codebase": "tsx scripts/index-codebase.ts",
 		"mcp:grafana": "node node_modules/@knittotextile/knitto-mcp-grafana/dist/index.js",
 		"test": "jest",

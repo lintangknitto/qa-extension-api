@@ -2,7 +2,8 @@ import { Router, requestHandler, requestValidator } from '@knittotextile/knitto-
 import controller from './session.controller';
 import request from './session.request';
 import { renderShareHtml } from './use-case/render-share-page';
-import { streamSessionVideoUseCase } from './use-case/session-video.use-case';
+import { streamSessionVideoUseCase, streamSharedSessionVideoUseCase, type TVideoStream } from './use-case/session-video.use-case';
+import type { Response } from 'express';
 
 const router = Router();
 
@@ -92,22 +93,46 @@ router.get(
 	requestHandler(controller.getVideoUrl)
 );
 
+/** Kirim video dengan dukungan HTTP Range (206) agar seek/scrub di `<video>` berfungsi. */
+const sendVideo = (res: Response, video: TVideoStream) => {
+	res.setHeader('Content-Type', video.contentType);
+	res.setHeader('Accept-Ranges', 'bytes');
+	res.setHeader('Access-Control-Allow-Origin', '*');
+	if (video.kind === 'unsatisfiable') {
+		res.status(416).setHeader('Content-Range', `bytes */${video.size}`);
+		res.end();
+		return;
+	}
+	if (video.kind === 'partial') {
+		res.status(206);
+		res.setHeader('Content-Range', `bytes ${video.range.start}-${video.range.end}/${video.size}`);
+		res.setHeader('Content-Length', video.range.end - video.range.start + 1);
+	} else {
+		res.setHeader('Content-Length', video.size);
+	}
+	video.stream.pipe(res);
+};
+
 router.get(
 	['/sessions/:id_session/video/stream', '/api/v1/sessions/:id_session/video/stream'],
 	async (req, res, next) => {
 		try {
 			const idSession = Number(req.params.id_session);
-			const video = await streamSessionVideoUseCase({ idSession });
-			res.setHeader('Content-Type', video.contentType || 'video/webm');
-			res.setHeader('Accept-Ranges', 'bytes');
-			res.setHeader('Content-Length', video.size);
-			res.setHeader('Access-Control-Allow-Origin', '*');
-			(video.stream as any).pipe(res);
+			sendVideo(res, await streamSessionVideoUseCase({ idSession, range: req.headers.range }));
 		} catch (err) {
 			next(err);
 		}
 	}
 );
+
+// Video halaman share: lewat API + share token, bukan URL presigned MinIO (host internal & kedaluwarsa).
+router.get('/share/:share_token/video', async (req, res, next) => {
+	try {
+		sendVideo(res, await streamSharedSessionVideoUseCase({ shareToken: req.params.share_token, range: req.headers.range }));
+	} catch (err) {
+		next(err);
+	}
+});
 
 router.get('/share/:share_token', async (req, res, next) => {
 	try {
