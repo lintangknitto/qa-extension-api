@@ -39,7 +39,7 @@ export const canAccessSession = (
 	userId: number,
 	userLevel: string | undefined,
 	adminLevels: readonly string[]
-): boolean => session.owner_user_id === userId || canManageProjects(userLevel, adminLevels);
+): boolean => Number(session.owner_user_id) === Number(userId) || canManageProjects(userLevel, adminLevels);
 
 export const assertCanAccessSession = (
 	session: Entity.IQaRecordingSession,
@@ -54,14 +54,14 @@ export const assertCanAccessSession = (
 export const toSessionResponse = (session: Entity.IQaRecordingSession) => {
 	const value = (item: unknown): unknown => item ?? null;
 	return {
-		id_session: value(session.id_session),
-		id_project: value(session.id_project),
-		id_test_case: value(session.id_test_case),
+		id_session: session.id_session !== undefined && session.id_session !== null ? Number(session.id_session) : null,
+		id_project: session.id_project !== undefined && session.id_project !== null ? Number(session.id_project) : null,
+		id_test_case: session.id_test_case !== undefined && session.id_test_case !== null ? Number(session.id_test_case) : null,
 		test_case_no: value(session.test_case_no),
 		title: value(session.title),
 		description: value(session.description),
 		target_url: value(session.target_url),
-		owner_user_id: value(session.owner_user_id),
+		owner_user_id: session.owner_user_id !== undefined && session.owner_user_id !== null ? Number(session.owner_user_id) : null,
 		status: value(session.status),
 		result: value(session.result),
 		actual_result: value(session.actual_result),
@@ -77,11 +77,11 @@ export const toSessionResponse = (session: Entity.IQaRecordingSession) => {
 };
 
 export const toCheckpointResponse = (checkpoint: Entity.IQaRecordingCheckpoint) => ({
-	id_checkpoint: checkpoint.id_checkpoint ?? null,
-	id_session: checkpoint.id_session ?? null,
+	id_checkpoint: checkpoint.id_checkpoint !== undefined && checkpoint.id_checkpoint !== null ? Number(checkpoint.id_checkpoint) : null,
+	id_session: checkpoint.id_session !== undefined && checkpoint.id_session !== null ? Number(checkpoint.id_session) : null,
 	note: checkpoint.note ?? null,
-	sequence: checkpoint.sequence ?? null,
-	id_artifact: checkpoint.id_artifact ?? null,
-	created_by_user_id: checkpoint.created_by_user_id ?? null,
+	sequence: checkpoint.sequence !== undefined && checkpoint.sequence !== null ? Number(checkpoint.sequence) : null,
+	id_artifact: checkpoint.id_artifact !== undefined && checkpoint.id_artifact !== null ? Number(checkpoint.id_artifact) : null,
+	created_by_user_id: checkpoint.created_by_user_id !== undefined && checkpoint.created_by_user_id !== null ? Number(checkpoint.created_by_user_id) : null,
 	created_at: checkpoint.created_at ?? null
 });

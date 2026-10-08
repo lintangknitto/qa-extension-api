@@ -1,11 +1,13 @@
 import {
 	any,
 	boolean,
+	check,
 	InferOutput,
 	integer,
 	maxLength,
 	minLength,
 	minValue,
+	nullish,
 	object,
 	optional,
 	pipe,
@@ -27,7 +29,28 @@ const codeSchema = pipe(
 	regex(PROJECT_CODE_REGEX, PROJECT_CODE_MSG)
 );
 
+const programIdSchema = pipe(
+	any(),
+	transform((value): number | null => (value === null || value === undefined || value === '' ? null : Number(value))),
+	check((value) => value === null || (Number.isSafeInteger(value) && value > 0), PROJECT_ID_MSG)
+);
+
+const programIdsSchema = pipe(
+	any(),
+	transform((value) => {
+		if (value === null || value === undefined || value === '') return [];
+		return Array.isArray(value) ? value : [value];
+	}),
+	check(
+		(values) => values.every((value) => Number.isSafeInteger(Number(value)) && Number(value) > 0),
+		'Program ID harus berupa bilangan bulat positif.'
+	),
+	transform((values) => values.map(Number))
+);
+
 const createProjectValidation = object({
+	id_program: optional(nullish(programIdSchema)),
+	program_ids: optional(nullish(programIdsSchema)),
 	name: pipe(
 		string(ERROR_VALIDATION_MSG.string('Nama project')),
 		minLength(3, ERROR_VALIDATION_MSG.minLength('Nama project', 3)),
@@ -43,11 +66,16 @@ const createProjectValidation = object({
 	base_url: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Base URL')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Base URL', 500)))
 	),
+	repo_url: optional(
+		pipe(string(ERROR_VALIDATION_MSG.string('Repo URL')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Repo URL', 500)))
+	),
 	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif')))
 });
 export type TCreateProjectValidation = InferOutput<typeof createProjectValidation>;
 
 const updateProjectValidation = object({
+	id_program: optional(nullish(programIdSchema)),
+	program_ids: optional(nullish(programIdsSchema)),
 	name: optional(
 		pipe(
 			string(ERROR_VALIDATION_MSG.string('Nama project')),
@@ -63,6 +91,9 @@ const updateProjectValidation = object({
 	),
 	base_url: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Base URL')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Base URL', 500)))
+	),
+	repo_url: optional(
+		pipe(string(ERROR_VALIDATION_MSG.string('Repo URL')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Repo URL', 500)))
 	),
 	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif')))
 });
@@ -83,7 +114,7 @@ const listProjectValidation = object({
 	page: optional(
 		pipe(
 			any(),
-			transform((value) => (value === undefined || value === '' ? 0 : Number(value))),
+			transform((value): number => (value === undefined || value === '' ? 0 : Number(value))),
 			integer(ERROR_VALIDATION_MSG.number('Page')),
 			minValue(0, ERROR_VALIDATION_MSG.minValue('Page', 0))
 		)
@@ -91,13 +122,19 @@ const listProjectValidation = object({
 	perPage: optional(
 		pipe(
 			any(),
-			transform((value) => (value === undefined || value === '' ? 20 : Number(value))),
+			transform((value): number => (value === undefined || value === '' ? 20 : Number(value))),
 			integer(ERROR_VALIDATION_MSG.number('Per Page')),
 			minValue(5, ERROR_VALIDATION_MSG.minValue('Per Page', 5))
 		)
 	),
 	search: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Pencarian')), maxLength(150, ERROR_VALIDATION_MSG.maxLength('Pencarian', 150)))
+	),
+	id_program: optional(
+		pipe(
+			any(),
+			transform((value): number | undefined => (value === undefined || value === '' ? undefined : Number(value)))
+		)
 	),
 	is_active: optional(picklist(['all', 'true', 'false']))
 });

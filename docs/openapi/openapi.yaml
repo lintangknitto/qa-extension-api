@@ -11,6 +11,24 @@ tags:
     description: Modul umum dan healthcheck (`src/app/http/home`).
   - name: auth
     description: Login, logout, dan autentikasi JWT (`src/app/http/auth`).
+  - name: users
+    description: Manajemen user.
+  - name: programs
+    description: Katalog program aplikasi.
+  - name: projects
+    description: Master project QA.
+  - name: test-cases
+    description: Test case per project.
+  - name: sessions
+    description: Sesi recording QA.
+  - name: artifacts
+    description: Artifact rekaman.
+  - name: generations
+    description: AI generation untuk sesi.
+  - name: codebase
+    description: Sinkronisasi dan pencarian codebase.
+  - name: observability
+    description: Koneksi Grafana dan korelasi sesi.
 x-tagGroups:
   - name: Umum
     tags:
@@ -18,6 +36,19 @@ x-tagGroups:
   - name: Autentikasi
     tags:
       - auth
+  - name: QA
+    tags:
+      - users
+      - programs
+      - projects
+      - test-cases
+      - sessions
+      - artifacts
+      - generations
+      - codebase
+      - observability
+security:
+  - bearerAuth: []
 paths:
   /:
     get:
@@ -44,6 +75,7 @@ paths:
       summary: Login
       description: Autentikasi pengguna dengan username dan password.
       operationId: postAuthLogin
+      security: []
       requestBody:
         required: true
         content:
@@ -52,7 +84,7 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
             example:
               username: diki
-              password: dmain
+              password: your-password
       responses:
         '200':
           description: Sukses
@@ -108,12 +140,1098 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/KnittoErrorEnvelope'
+  /auth/change-password:
+    post:
+      tags: [auth]
+      summary: Ubah password sendiri
+      operationId: postAuthChangePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password berhasil diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnittoSuccessEnvelope'
+  /users:
+    get:
+      tags: [users]
+      summary: Daftar user
+      operationId: getUsers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: level
+          in: query
+          schema: { type: string, enum: [all, SUPERADMIN, ADMIN, QA, IMPLEMENTOR, VIEWER] }
+        - name: is_active
+          in: query
+          schema: { type: string, enum: [all, 'true', 'false'] }
+      responses:
+        '200':
+          description: Daftar user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [users]
+      summary: Buat user
+      operationId: postUsers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserRequest' }
+      responses:
+        '200':
+          description: User berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /users/{id_user}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [users]
+      summary: Detail user
+      operationId: getUser
+      responses:
+        '200':
+          description: Detail user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    put:
+      tags: [users]
+      summary: Ubah user
+      operationId: putUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserRequest' }
+      responses:
+        '200':
+          description: User berhasil diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    delete:
+      tags: [users]
+      summary: Hapus atau nonaktifkan user
+      operationId: deleteUser
+      responses:
+        '200':
+          description: User berhasil dihapus atau dinonaktifkan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /users/{id_user}/reset-password:
+    patch:
+      tags: [users]
+      summary: Reset password user
+      operationId: patchUserPassword
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '200':
+          description: Password berhasil direset
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /programs/active:
+    get:
+      tags: [programs]
+      summary: Daftar program aktif
+      operationId: getActivePrograms
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+        - name: is_active
+          in: query
+          schema: { type: string, enum: [all, 'true', 'false'] }
+      responses:
+        '200':
+          description: Daftar program aktif
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /programs:
+    get:
+      tags: [programs]
+      summary: Daftar program
+      operationId: getPrograms
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+        - name: is_active
+          in: query
+          schema: { type: string, enum: [all, 'true', 'false'] }
+      responses:
+        '200':
+          description: Daftar program
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [programs]
+      summary: Buat program
+      operationId: postPrograms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProgramRequest' }
+      responses:
+        '200':
+          description: Program berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /programs/{id_program}:
+    parameters:
+      - $ref: '#/components/parameters/ProgramId'
+    get:
+      tags: [programs]
+      summary: Detail program
+      operationId: getProgram
+      responses:
+        '200':
+          description: Detail program
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    put:
+      tags: [programs]
+      summary: Ubah program
+      operationId: putProgram
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProgramRequest' }
+      responses:
+        '200':
+          description: Program berhasil diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    delete:
+      tags: [programs]
+      summary: Hapus program
+      operationId: deleteProgram
+      responses:
+        '200':
+          description: Program berhasil dihapus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/active:
+    get:
+      tags: [projects]
+      summary: Daftar project aktif
+      operationId: getActiveProjects
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+        - name: id_program
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: is_active
+          in: query
+          schema: { type: string, enum: [all, 'true', 'false'] }
+      responses:
+        '200':
+          description: Daftar project aktif
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects:
+    get:
+      tags: [projects]
+      summary: Daftar project
+      operationId: getProjects
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+        - name: id_program
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: is_active
+          in: query
+          schema: { type: string, enum: [all, 'true', 'false'] }
+      responses:
+        '200':
+          description: Daftar project
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [projects]
+      summary: Buat project
+      operationId: postProjects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProjectRequest' }
+      responses:
+        '200':
+          description: Project berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [projects]
+      summary: Detail project
+      operationId: getProjectById
+      responses:
+        '200':
+          description: Detail project
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    put:
+      tags: [projects]
+      summary: Ubah project
+      operationId: putProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProjectRequest' }
+      responses:
+        '200':
+          description: Project berhasil diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    delete:
+      tags: [projects]
+      summary: Nonaktifkan project
+      operationId: deleteProject
+      responses:
+        '200':
+          description: Project berhasil dinonaktifkan atau dihapus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/test-cases:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [test-cases]
+      summary: Daftar test case project
+      operationId: getProjectTestCases
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: feature
+          in: query
+          schema: { type: string }
+        - name: test_type
+          in: query
+          schema: { type: string }
+        - name: id_program
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Daftar test case
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [test-cases]
+      summary: Buat test case
+      operationId: postProjectTestCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TestCaseWriteRequest' }
+      responses:
+        '200':
+          description: Test case berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/test-cases/import:
+    post:
+      tags: [test-cases]
+      summary: Import beberapa test case
+      operationId: postProjectTestCaseImport
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/TestCaseWriteRequest' }
+      responses:
+        '200':
+          description: Import test case selesai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/test-cases/{id_test_case}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/TestCaseId'
+    get:
+      tags: [test-cases]
+      summary: Detail test case
+      operationId: getProjectTestCase
+      responses:
+        '200':
+          description: Detail test case
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    put:
+      tags: [test-cases]
+      summary: Ubah test case
+      operationId: putProjectTestCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateTestCaseRequest' }
+      responses:
+        '200':
+          description: Test case berhasil diubah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    delete:
+      tags: [test-cases]
+      summary: Hapus test case
+      operationId: deleteProjectTestCase
+      responses:
+        '200':
+          description: Test case berhasil dihapus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions:
+    get:
+      tags: [sessions]
+      summary: Daftar sesi QA
+      operationId: getSessions
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: id_project
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: tester_user_id
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [recording, completed] }
+        - name: result
+          in: query
+          schema: { type: string, enum: [PASS, FAIL, BLOCKED] }
+        - name: date_from
+          in: query
+          schema: { type: string, format: date }
+        - name: date_to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Daftar sesi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [sessions]
+      summary: Buat sesi recording
+      operationId: postSessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSessionRequest' }
+      responses:
+        '200':
+          description: Sesi berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/active:
+    get:
+      tags: [sessions]
+      summary: Ambil sesi recording aktif milik pengguna
+      operationId: getActiveSession
+      responses:
+        '200':
+          description: Sesi aktif atau null
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/active:
+    get:
+      tags: [sessions]
+      summary: Alias versi untuk sesi recording aktif
+      operationId: getActiveSessionV1
+      responses:
+        '200':
+          description: Sesi aktif atau null
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/active/discard:
+    post:
+      tags: [sessions]
+      summary: Buang sesi aktif yang tertinggal
+      operationId: postDiscardActiveSession
+      responses:
+        '200':
+          description: Sesi aktif berhasil dibuang
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/active/discard:
+    post:
+      tags: [sessions]
+      summary: Alias versi untuk membuang sesi aktif
+      operationId: postDiscardActiveSessionV1
+      responses:
+        '200':
+          description: Sesi aktif berhasil dibuang
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/discard-active:
+    post:
+      tags: [sessions]
+      summary: Alias untuk membuang sesi aktif
+      operationId: postDiscardActiveSessionLegacy
+      responses:
+        '200':
+          description: Sesi aktif berhasil dibuang
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [sessions]
+      summary: Detail sesi
+      operationId: getSession
+      responses:
+        '200':
+          description: Detail sesi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/end:
+    post:
+      tags: [sessions]
+      summary: Akhiri sesi dan simpan hasil
+      operationId: postEndSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EndSessionRequest' }
+      responses:
+        '200':
+          description: Sesi berhasil diakhiri
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/checkpoints:
+    post:
+      tags: [sessions]
+      summary: Tambah checkpoint sesi
+      operationId: postSessionCheckpoint
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCheckpointRequest' }
+      responses:
+        '200':
+          description: Checkpoint berhasil dibuat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/share:
+    post:
+      tags: [sessions]
+      summary: Buat atau ambil URL berbagi sesi
+      operationId: postSessionShare
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: URL berbagi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/share/{share_token}/ai-context:
+    get:
+      tags: [sessions]
+      summary: Ambil konteks AI dari sesi yang dibagikan
+      operationId: getSharedSessionAiContext
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: Konteks sesi berbagi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/share/{share_token}/ai-context:
+    get:
+      tags: [sessions]
+      summary: Alias versi untuk konteks AI sesi berbagi
+      operationId: getSharedSessionAiContextV1
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: Konteks sesi berbagi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/video/upload:
+    post:
+      tags: [sessions]
+      summary: Upload video sesi secara langsung
+      operationId: postSessionVideoUpload
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          video/webm:
+            schema: { type: string, format: binary }
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: Video berhasil diunggah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/video/upload:
+    post:
+      tags: [sessions]
+      summary: Alias versi upload video langsung
+      operationId: postSessionVideoUploadV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          video/webm:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: Video berhasil diunggah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/video/presign-upload:
+    post:
+      tags: [sessions]
+      summary: Buat presigned URL untuk upload video
+      operationId: postSessionVideoPresign
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignVideoRequest' }
+      responses:
+        '200':
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/video/presign-upload:
+    post:
+      tags: [sessions]
+      summary: Alias versi presigned upload video
+      operationId: postSessionVideoPresignV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignVideoRequest' }
+      responses:
+        '200':
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/video/complete:
+    post:
+      tags: [sessions]
+      summary: Selesaikan upload video
+      operationId: postSessionVideoComplete
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteVideoRequest' }
+      responses:
+        '200':
+          description: Upload video selesai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/video/complete:
+    post:
+      tags: [sessions]
+      summary: Alias versi penyelesaian upload video
+      operationId: postSessionVideoCompleteV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteVideoRequest' }
+      responses:
+        '200':
+          description: Upload video selesai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/video:
+    get:
+      tags: [sessions]
+      summary: Ambil URL video sesi
+      operationId: getSessionVideo
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: URL video
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/video:
+    get:
+      tags: [sessions]
+      summary: Alias versi URL video sesi
+      operationId: getSessionVideoV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: URL video
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/video/stream:
+    get:
+      tags: [sessions]
+      summary: Stream video sesi
+      operationId: getSessionVideoStream
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Konten video
+          content:
+            video/webm:
+              schema: { type: string, format: binary }
+  /api/v1/sessions/{id_session}/video/stream:
+    get:
+      tags: [sessions]
+      summary: Alias versi stream video sesi
+      operationId: getSessionVideoStreamV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Konten video
+          content:
+            video/webm:
+              schema: { type: string, format: binary }
+  /sessions/{id_session}/artifacts:
+    get:
+      tags: [artifacts]
+      summary: Daftar artifact sesi
+      operationId: getSessionArtifacts
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Daftar artifact
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/artifacts:
+    get:
+      tags: [artifacts]
+      summary: Alias versi daftar artifact
+      operationId: getSessionArtifactsV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Daftar artifact
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/artifacts/presign-upload:
+    post:
+      tags: [artifacts]
+      summary: Buat presigned URL upload artifact
+      operationId: postSessionArtifactPresign
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignArtifactRequest' }
+      responses:
+        '200':
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/artifacts/presign-upload:
+    post:
+      tags: [artifacts]
+      summary: Alias versi presigned artifact
+      operationId: postSessionArtifactPresignV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignArtifactRequest' }
+      responses:
+        '200':
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/artifacts/{id_artifact}/complete:
+    post:
+      tags: [artifacts]
+      summary: Tandai upload artifact selesai
+      operationId: postSessionArtifactComplete
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/ArtifactId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteArtifactRequest' }
+      responses:
+        '200':
+          description: Artifact upload selesai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/artifacts/{id_artifact}/complete:
+    post:
+      tags: [artifacts]
+      summary: Alias versi complete artifact
+      operationId: postSessionArtifactCompleteV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/ArtifactId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteArtifactRequest' }
+      responses:
+        '200':
+          description: Artifact upload selesai
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/artifacts/{id_artifact}/download-url:
+    get:
+      tags: [artifacts]
+      summary: Buat URL download artifact
+      operationId: getSessionArtifactDownloadUrl
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: Presigned download URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /api/v1/sessions/{id_session}/artifacts/{id_artifact}/download-url:
+    get:
+      tags: [artifacts]
+      summary: Alias versi URL download artifact
+      operationId: getSessionArtifactDownloadUrlV1
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: Presigned download URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/generations:
+    get:
+      tags: [generations]
+      summary: Daftar hasil generation sesi
+      operationId: getSessionGenerations
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Daftar generation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+    post:
+      tags: [generations]
+      summary: Generate atau ulangi hasil sesi
+      operationId: postSessionGenerations
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenerateSessionRequest' }
+      responses:
+        '200':
+          description: Generation dimulai atau dikembalikan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/codebase/sync:
+    post:
+      tags: [codebase]
+      summary: Sinkronisasi dan index codebase project
+      operationId: postProjectCodebaseSync
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncCodebaseRequest' }
+      responses:
+        '200':
+          description: Hasil sinkronisasi index
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/codebase/search:
+    post:
+      tags: [codebase]
+      summary: Pencarian semantik codebase
+      operationId: postProjectCodebaseSearch
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SearchCodebaseRequest' }
+      responses:
+        '200':
+          description: Hasil pencarian codebase
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/codebase/symbols:
+    get:
+      tags: [codebase]
+      summary: Daftar simbol AST project
+      operationId: getProjectCodebaseSymbols
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: kind
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: Daftar simbol
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /observability/health:
+    get:
+      tags: [observability]
+      summary: Periksa koneksi Grafana
+      operationId: getObservabilityHealth
+      responses:
+        '200':
+          description: Status koneksi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /observability/datasources:
+    get:
+      tags: [observability]
+      summary: Daftar datasource Grafana
+      operationId: getObservabilityDatasources
+      responses:
+        '200':
+          description: Datasource yang tersedia
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /observability/sessions/{id_session}/correlate:
+    post:
+      tags: [observability]
+      summary: Korelasikan sesi QA dengan log Grafana
+      operationId: postCorrelateSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - name: logql
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Hasil korelasi session, log, dan kode
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /share/{share_token}:
+    get:
+      tags: [sessions]
+      summary: Halaman publik sesi berbagi
+      operationId: getSharedSessionPage
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: HTML laporan sesi berbagi
+          content:
+            text/html:
+              schema: { type: string }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    UserId:
+      name: id_user
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ProgramId:
+      name: id_program
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ProjectId:
+      name: id_project
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    TestCaseId:
+      name: id_test_case
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    SessionId:
+      name: id_session
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ArtifactId:
+      name: id_artifact
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ShareToken:
+      name: share_token
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    PerPage:
+      name: perPage
+      in: query
+      schema: { type: integer, minimum: 1, default: 20 }
   schemas:
     KnittoSuccessEnvelope:
       type: object
@@ -151,6 +1269,185 @@ components:
           type: string
           format: password
           description: Kata sandi
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password: { type: string, format: password }
+        new_password: { type: string, format: password, minLength: 6 }
+    CreateUserRequest:
+      type: object
+      required: [nama, username, password, level]
+      properties:
+        nama: { type: string, minLength: 2, maxLength: 150 }
+        username: { type: string, minLength: 3, maxLength: 50, pattern: '^[a-zA-Z0-9._-]+$' }
+        password: { type: string, format: password, minLength: 6 }
+        level: { type: string, enum: [SUPERADMIN, ADMIN, QA, IMPLEMENTOR, VIEWER] }
+        is_active: { type: boolean }
+        project_ids:
+          type: array
+          items: { type: integer, minimum: 1 }
+    UpdateUserRequest:
+      type: object
+      properties:
+        nama: { type: string, minLength: 2, maxLength: 150 }
+        level: { type: string, enum: [SUPERADMIN, ADMIN, QA, IMPLEMENTOR, VIEWER] }
+        is_active: { type: boolean }
+        project_ids:
+          type: array
+          items: { type: integer, minimum: 1 }
+    ResetPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, format: password, minLength: 6 }
+    CreateProgramRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 150 }
+        code: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+        type: { type: string, enum: [FRONTEND, SERVICE, frontend, service] }
+        grafana_dashboard_url: { type: string, maxLength: 500 }
+        description: { type: string, maxLength: 2000 }
+        base_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500 }
+        is_active: { type: boolean }
+    UpdateProgramRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 3, maxLength: 150 }
+        code: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+        type: { type: string, enum: [FRONTEND, SERVICE, frontend, service] }
+        grafana_dashboard_url: { type: string, maxLength: 500 }
+        description: { type: string, maxLength: 2000 }
+        base_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500 }
+        is_active: { type: boolean }
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        id_program: { type: integer, nullable: true, minimum: 1 }
+        program_ids:
+          type: array
+          items: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 3, maxLength: 150 }
+        code: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+        description: { type: string, maxLength: 2000 }
+        base_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500 }
+        is_active: { type: boolean }
+    UpdateProjectRequest:
+      type: object
+      properties:
+        id_program: { type: integer, nullable: true, minimum: 1 }
+        program_ids:
+          type: array
+          items: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 3, maxLength: 150 }
+        description: { type: string, maxLength: 2000 }
+        base_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500 }
+        is_active: { type: boolean }
+    TestCaseFields:
+      type: object
+      properties:
+        id_program: { type: integer, nullable: true, minimum: 1 }
+        test_case_id: { type: string, maxLength: 80 }
+        title: { type: string, maxLength: 255 }
+        group_no: { type: string, maxLength: 50 }
+        feature: { type: string, maxLength: 150 }
+        process_no: { type: string, maxLength: 50 }
+        test_type: { type: string, maxLength: 10 }
+        test_variable: { type: string, maxLength: 255 }
+        pre_condition: { type: string }
+        test_data: { type: string }
+        test_steps: { type: string }
+        expected_result: { type: string }
+        actual_result: { type: string }
+        status: { type: string, maxLength: 30 }
+        evidence: { type: string }
+        remarks: { type: string }
+        automation_tools: { type: string, maxLength: 100 }
+    TestCaseWriteRequest:
+      allOf:
+        - $ref: '#/components/schemas/TestCaseFields'
+        - type: object
+          required: [test_case_id, title]
+    UpdateTestCaseRequest:
+      $ref: '#/components/schemas/TestCaseFields'
+    CreateSessionRequest:
+      type: object
+      required: [test_case_no, title]
+      properties:
+        id_project: { type: integer, nullable: true, minimum: 1 }
+        id_test_case: { type: integer, nullable: true, minimum: 1 }
+        test_case_no: { type: string, minLength: 1, maxLength: 80 }
+        title: { type: string, minLength: 1, maxLength: 255 }
+        description: { type: string, maxLength: 5000, nullable: true }
+        target_url: { type: string, maxLength: 1000, nullable: true }
+        force_end_previous: { type: boolean }
+    EndSessionRequest:
+      type: object
+      required: [result]
+      properties:
+        result: { type: string, enum: [PASS, FAIL, BLOCKED] }
+        actual_result: { type: string, maxLength: 5000 }
+    CreateCheckpointRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 2000 }
+        sequence: { type: integer, minimum: 0 }
+        id_artifact: { type: integer, minimum: 1 }
+    PresignVideoRequest:
+      type: object
+      required: [size_bytes]
+      properties:
+        size_bytes: { type: integer, minimum: 1 }
+        content_type: { type: string }
+    CompleteVideoRequest:
+      type: object
+      required: [object_key]
+      properties:
+        object_key: { type: string, minLength: 1 }
+    PresignArtifactRequest:
+      type: object
+      required: [kind, content_type, size_bytes]
+      properties:
+        kind: { type: string, enum: [screenshot, network_body, console, dom, video, storage_state, other] }
+        content_type: { type: string, maxLength: 150 }
+        size_bytes: { type: integer, minimum: 1 }
+        sequence: { type: integer, minimum: 0 }
+    CompleteArtifactRequest:
+      type: object
+      properties:
+        size_bytes: { type: integer, minimum: 1 }
+        checksum_sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+    GenerateSessionRequest:
+      type: object
+      properties:
+        kinds:
+          type: array
+          items: { type: string, enum: [markdown, playwright] }
+    SyncCodebaseRequest:
+      type: object
+      properties:
+        source_type: { type: string }
+        base_dir: { type: string }
+        repo_url: { type: string }
+        branch: { type: string }
+        github_token: { type: string, writeOnly: true }
+        force_reindex: { type: boolean }
+    SearchCodebaseRequest:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string, minLength: 1 }
+        limit: { type: integer, minimum: 1, maximum: 50 }
+        similarity_threshold: { type: number, minimum: 0, maximum: 1 }
+        kind: { type: string }
     LoginResult:
       type: object
       properties:

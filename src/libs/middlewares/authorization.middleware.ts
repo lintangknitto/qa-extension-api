@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { ExpressType, sendResponse } from '@knittotextile/knitto-http';
 import { APP_SECRET_KEY } from '@/libs/config';
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 import guestPath from '../config/guestPathHttp';
 
 const authorizeMiddleware = (
@@ -77,19 +77,20 @@ const authorizeMiddleware = (
 						res
 					);
 				} else {
-					const [user] = await mysqlConnection.raw<
+					const [user] = await postgresConnection.raw<
 						Array<{
 							id_user: number;
 							nama: string;
 							username: string;
 							level: string;
+							is_active: boolean | number;
 						}>
 					>(
-						'SELECT id_user, nama, username, level FROM user WHERE id_user = ?',
+						'SELECT id_user, nama, username, level, is_active FROM users WHERE id_user = ? LIMIT 1',
 						[decode.id_user]
 					);
 
-					if (!user) {
+					if (!user || (user.is_active !== undefined && (user.is_active === false || Number(user.is_active) === 0))) {
 						sendResponse(
 							{
 								status: 401,

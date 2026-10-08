@@ -1,53 +1,64 @@
-import { MySqlResultSetHeader } from '@knittotextile/knitto-mysql/dist/libs/MySqlConnector';
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 import type { TCreateTestCaseValidation, TUpdateTestCaseValidation } from '../test-case.request';
 import { normalizeTestCaseStatus, normalizeTestType } from '../domain/test-case.domain';
 import { findTestCaseByCode } from '../queries/test-case.queries';
+
+const orNull = <T>(value: T | null | undefined): T | null => value ?? null;
 
 export const insertTestCase = async (
 	idProject: number,
 	data: TCreateTestCaseValidation,
 	userId?: number
 ): Promise<number> => {
-	const result = await mysqlConnection.raw<MySqlResultSetHeader>(
-		`INSERT INTO qa_test_case (
-			id_project, group_no, feature, process_no, test_type,
+	const [row] = await postgresConnection.raw<Array<{ id_test_case: number | string }>>(
+		`INSERT INTO test_cases (
+			id_project, id_program, group_no, feature, process_no, test_type,
 			test_case_id, test_variable, title, pre_condition,
 			test_data, test_steps, expected_result, actual_result,
-			status, evidence, remarks, automation_tools, created_by_user_id
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			status, evidence, remarks, automation_tools, created_by_user_id,
+			created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10,
+			$11, $12, $13, $14,
+			$15, $16, $17, $18, $19,
+			CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+		)
+		RETURNING id_test_case`,
 		[
 			idProject,
-			data.group_no ?? null,
-			data.feature ?? null,
-			data.process_no ?? null,
+			data.id_program ? Number(data.id_program) : null,
+			orNull(data.group_no),
+			orNull(data.feature),
+			orNull(data.process_no),
 			normalizeTestType(data.test_type),
 			data.test_case_id.trim(),
-			data.test_variable ?? null,
+			orNull(data.test_variable),
 			data.title.trim(),
-			data.pre_condition ?? null,
-			data.test_data ?? null,
-			data.test_steps ?? null,
-			data.expected_result ?? null,
-			data.actual_result ?? null,
+			orNull(data.pre_condition),
+			orNull(data.test_data),
+			orNull(data.test_steps),
+			orNull(data.expected_result),
+			orNull(data.actual_result),
 			normalizeTestCaseStatus(data.status),
-			data.evidence ?? null,
-			data.remarks ?? null,
-			data.automation_tools ?? null,
-			userId ?? null
+			orNull(data.evidence),
+			orNull(data.remarks),
+			orNull(data.automation_tools),
+			orNull(userId)
 		]
 	);
 
-	return Number(result.insertId);
+	return Number(row?.id_test_case);
 };
 
 const buildUpdateFields = (
 	data: TUpdateTestCaseValidation
 ): { updates: string[]; params: (string | number | null)[] } => {
-	const updates: string[] = [];
+	const updates: string[] = ['updated_at = CURRENT_TIMESTAMP'];
 	const params: (string | number | null)[] = [];
 
 	const fields: [keyof TUpdateTestCaseValidation, string, ((v: unknown) => string | number | null)?][] = [
+		['id_program', 'id_program', (v) => (v ? Number(v) : null)],
 		['group_no', 'group_no'],
 		['feature', 'feature'],
 		['process_no', 'process_no'],
@@ -68,9 +79,9 @@ const buildUpdateFields = (
 
 	for (const [key, col, transform] of fields) {
 		if (data[key] !== undefined) {
-			updates.push(`${col} = ?`);
-			const raw = data[key] as string | number | null | undefined;
+			const raw = data[key];
 			params.push(transform ? transform(raw) : (raw ?? null));
+			updates.push(`${col} = $${params.length}`);
 		}
 	}
 
@@ -83,18 +94,18 @@ export const updateTestCase = async (
 ): Promise<void> => {
 	const { updates, params } = buildUpdateFields(data);
 
-	if (updates.length === 0) return;
+	if (updates.length <= 1) return; // Only updated_at is present
 
 	params.push(idTestCase);
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		`UPDATE qa_test_case SET ${updates.join(', ')} WHERE id_test_case = ?`,
+	await postgresConnection.raw(
+		`UPDATE test_cases SET ${updates.join(', ')} WHERE id_test_case = $${params.length}`,
 		params
 	);
 };
 
 export const deleteTestCase = async (idTestCase: number): Promise<void> => {
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		'DELETE FROM qa_test_case WHERE id_test_case = ?',
+	await postgresConnection.raw(
+		'DELETE FROM test_cases WHERE id_test_case = $1',
 		[idTestCase]
 	);
 };
@@ -142,10 +153,10 @@ export const updateTestCaseStatusAndEvidence = async (
 	sessionId: number
 ): Promise<void> => {
 	const evidenceText = `Session #${sessionId}`;
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		`UPDATE qa_test_case
-		 SET status = ?, actual_result = ?, last_session_id = ?, evidence = ?
-		 WHERE id_test_case = ?`,
+	await postgresConnection.raw(
+		`UPDATE test_cases
+		 SET status = $1, actual_result = $2, last_session_id = $3, evidence = $4, updated_at = CURRENT_TIMESTAMP
+		 WHERE id_test_case = $5`,
 		[normalizeTestCaseStatus(status), actualResult, sessionId, evidenceText, idTestCase]
 	);
 };

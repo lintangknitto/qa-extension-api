@@ -94,18 +94,18 @@ export const assertArtifactBelongsToSession = (
 	artifact: Entity.IQaRecordingArtifact,
 	idSession: number
 ): void => {
-	if (artifact.id_session !== idSession)
+	if (Number(artifact.id_session) !== Number(idSession))
 		throw new NotFoundException('Artifact tidak ditemukan pada session ini.');
 };
 
 export const toArtifactResponse = (artifact: Entity.IQaRecordingArtifact) => ({
-	id_artifact: artifact.id_artifact ?? null,
-	id_session: artifact.id_session ?? null,
+	id_artifact: artifact.id_artifact !== undefined && artifact.id_artifact !== null ? Number(artifact.id_artifact) : null,
+	id_session: artifact.id_session !== undefined && artifact.id_session !== null ? Number(artifact.id_session) : null,
 	kind: artifact.kind ?? null,
 	object_key: artifact.object_key ?? null,
 	content_type: artifact.content_type ?? null,
 	size_bytes: Number(artifact.size_bytes ?? 0),
-	sequence: artifact.sequence ?? null,
+	sequence: artifact.sequence !== undefined && artifact.sequence !== null ? Number(artifact.sequence) : null,
 	checksum_sha256: artifact.checksum_sha256 ?? null,
 	status: artifact.status ?? null,
 	created_at: artifact.created_at ?? null

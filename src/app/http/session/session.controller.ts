@@ -23,6 +23,9 @@ import {
 	getSessionVideoUrlUseCase,
 	uploadSessionVideoDirectUseCase
 } from './use-case/session-video.use-case';
+import * as queries from './queries/session.queries';
+import * as repo from './repo/session.repo';
+import * as domain from './domain/session.domain';
 
 const create: TRequestFunction = async (req) => {
 	const input = req.body as TCreateSessionValidation;
@@ -151,6 +154,16 @@ const uploadVideoDirect: TRequestFunction = async (req) => {
 	return { result, statusCode: 201 };
 };
 
+const getActive: TRequestFunction = async (req) => {
+	const active = await queries.findActiveSessionByOwner(req.userId);
+	return { result: active ? domain.toSessionResponse(active) : null };
+};
+
+const discardActive: TRequestFunction = async (req) => {
+	const count = await repo.discardActiveSessionsByOwner(req.userId);
+	return { result: { success: true, count } };
+};
+
 export default {
 	create,
 	list,
@@ -162,5 +175,7 @@ export default {
 	presignVideo,
 	completeVideo,
 	getVideoUrl,
-	uploadVideoDirect
+	uploadVideoDirect,
+	getActive,
+	discardActive
 };

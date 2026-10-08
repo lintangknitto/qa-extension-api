@@ -30,6 +30,12 @@ export const toTestCaseResponse = (testCase: Entity.IQaTestCase) => {
 	return {
 		id_test_case: Number(testCase.id_test_case),
 		id_project: Number(testCase.id_project),
+		id_program: testCase.id_program ? Number(testCase.id_program) : null,
+		program_name: value(testCase.program_name),
+		program_code: value(testCase.program_code),
+		program_type: value((testCase as any).program_type),
+		program_base_url: value((testCase as any).program_base_url),
+		program_repo_url: value((testCase as any).program_repo_url),
 		group_no: value(testCase.group_no),
 		feature: value(testCase.feature),
 		process_no: value(testCase.process_no),

@@ -26,12 +26,14 @@ export const listProjectsUseCase = async (ctx: {
 			offset,
 			perPage,
 			search: ctx.input.search,
+			idProgram: ctx.input.id_program,
 			isActive,
 			userId: ctx.userId,
 			isGlobalAdmin
 		}),
 		queries.countProjects({
 			search: ctx.input.search,
+			idProgram: ctx.input.id_program,
 			isActive,
 			userId: ctx.userId,
 			isGlobalAdmin
@@ -60,11 +62,13 @@ export const listActiveProjectsUseCase = async (ctx: {
 			offset,
 			perPage,
 			search: ctx.input.search,
+			idProgram: ctx.input.id_program,
 			userId: ctx.userId,
 			isGlobalAdmin
 		}),
 		queries.countActiveProjects({
 			search: ctx.input.search,
+			idProgram: ctx.input.id_program,
 			userId: ctx.userId,
 			isGlobalAdmin
 		})

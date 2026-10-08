@@ -39,14 +39,14 @@ export const canManageSpecificProject = (
 	if (!userLevel) return false;
 	const norm = userLevel.toUpperCase();
 	if (['SUPERADMIN', 'ADMIN'].includes(norm)) return true;
-	if (
-		norm === 'QA' &&
-		typeof userId === 'number' &&
-		project.created_by_user_id !== undefined &&
-		project.created_by_user_id !== null &&
-		Number(project.created_by_user_id) === Number(userId)
-	) {
-		return true;
+	if (norm === 'QA') {
+		if (project.created_by_user_id === undefined || project.created_by_user_id === null) {
+			return true;
+		}
+		if (typeof userId === 'number' && Number(project.created_by_user_id) === Number(userId)) {
+			return true;
+		}
+		return false;
 	}
 	return false;
 };
@@ -84,14 +84,41 @@ export const assertProjectExists = (project: Entity.IQaProject | null): Entity.I
 
 export { normalizePagination } from '@/libs/helpers/pagination';
 
-export const toProjectResponse = (project: Entity.IQaProject) => ({
-	id_project: project.id_project ?? null,
-	name: project.name ?? null,
-	code: project.code ?? null,
-	description: project.description ?? null,
-	base_url: project.base_url ?? null,
-	is_active: project.is_active === 1,
-	created_by_user_id: project.created_by_user_id ? Number(project.created_by_user_id) : null,
-	created_at: project.created_at ?? null,
-	updated_at: project.updated_at ?? null
+type TProjectProgram = NonNullable<Entity.IQaProject['programs']>[number];
+
+const toProgramSummary = (program: TProjectProgram) => ({
+	id_program: Number(program.id_program),
+	name: program.name,
+	code: program.code,
+	type: (program as any).type ?? null,
+	base_url: program.base_url ?? null,
+	repo_url: program.repo_url ?? null
 });
+
+/** Primary program fields: explicit columns first, otherwise the first linked program. */
+const toPrimaryProgram = (project: Entity.IQaProject, programs: TProjectProgram[], programIds: number[]) => ({
+	id_program: project.id_program ? Number(project.id_program) : (programIds[0] ?? null),
+	program_name: project.program_name ?? programs[0]?.name ?? null,
+	program_code: project.program_code ?? programs[0]?.code ?? null
+});
+
+export const toProjectResponse = (project: Entity.IQaProject) => {
+	const programs = project.programs ?? [];
+	const programIds = project.program_ids?.map(Number) ?? programs.map((program) => Number(program.id_program));
+
+	return {
+		id_project: project.id_project ? Number(project.id_project) : null,
+		...toPrimaryProgram(project, programs, programIds),
+		program_ids: programIds,
+		programs: programs.map(toProgramSummary),
+		name: project.name ?? null,
+		code: project.code ?? null,
+		description: project.description ?? null,
+		base_url: project.base_url ?? null,
+		repo_url: project.repo_url ?? null,
+		is_active: project.is_active === 1 || project.is_active === true,
+		created_by_user_id: project.created_by_user_id ? Number(project.created_by_user_id) : null,
+		created_at: project.created_at ?? null,
+		updated_at: project.updated_at ?? null
+	};
+};

@@ -1,27 +1,62 @@
-import { MySqlResultSetHeader } from '@knittotextile/knitto-mysql/dist/libs/MySqlConnector';
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
+import type { PoolClient } from 'pg';
+
+const syncProjectPrograms = async (
+	client: PoolClient,
+	idProject: number,
+	programIds: number[]
+): Promise<void> => {
+	const uniqueIds = Array.from(new Set(programIds));
+	if (uniqueIds.some((id) => !Number.isSafeInteger(id) || id < 1)) {
+		throw new Error('Program ID harus berupa bilangan bulat positif.');
+	}
+
+	await client.query('DELETE FROM project_programs WHERE id_project = $1', [idProject]);
+	for (const idProgram of uniqueIds) {
+		await client.query(
+			'INSERT INTO project_programs (id_project, id_program) VALUES ($1, $2)',
+			[idProject, idProgram]
+		);
+	}
+};
 
 export const insertProject = async (fields: {
 	name: string;
 	code: string;
+	idProgram?: number | null;
+	programIds?: number[];
 	description?: string | null;
 	baseUrl?: string | null;
+	repoUrl?: string | null;
 	isActive: boolean;
 	createdByUserId?: number | null;
 }): Promise<number> => {
-	const result = await mysqlConnection.raw<MySqlResultSetHeader>(
-		`INSERT INTO qa_project (name, code, description, base_url, is_active, created_by_user_id)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		[
-			fields.name,
-			fields.code,
-			fields.description ?? null,
-			fields.baseUrl ?? null,
-			fields.isActive ? 1 : 0,
-			fields.createdByUserId ?? null
-		]
-	);
-	return Number(result.insertId);
+	const programIds = fields.programIds && fields.programIds.length > 0
+		? fields.programIds
+		: fields.idProgram
+			? [fields.idProgram]
+			: [];
+	return postgresConnection.transaction(async (client) => {
+		const { rows } = await client.query<{ id_project: number | string }>(
+			`INSERT INTO projects (name, code, id_program, description, base_url, repo_url, is_active, created_by_user_id)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			 RETURNING id_project`,
+			[
+				fields.name,
+				fields.code,
+				fields.idProgram ?? null,
+				fields.description ?? null,
+				fields.baseUrl ?? null,
+				fields.repoUrl ?? null,
+				Boolean(fields.isActive),
+				fields.createdByUserId ?? null
+			]
+		);
+		const idProject = Number(rows[0]?.id_project);
+		if (!Number.isSafeInteger(idProject) || idProject < 1) throw new Error('Gagal membuat project.');
+		if (programIds.length > 0) await syncProjectPrograms(client, idProject, programIds);
+		return idProject;
+	});
 };
 
 export const updateProject = async (
@@ -29,62 +64,72 @@ export const updateProject = async (
 	fields: {
 		name?: string;
 		code?: string;
+		idProgram?: number | null;
+		programIds?: number[];
 		description?: string | null;
 		baseUrl?: string | null;
+		repoUrl?: string | null;
 		isActive?: boolean;
 	}
 ): Promise<void> => {
-	const assignments: string[] = [];
+	const assignments: string[] = ['updated_at = CURRENT_TIMESTAMP'];
 	const params: unknown[] = [];
 
 	if (fields.name !== undefined) {
-		assignments.push('name = ?');
 		params.push(fields.name);
+		assignments.push(`name = $${params.length}`);
 	}
 	if (fields.code !== undefined) {
-		assignments.push('code = ?');
 		params.push(fields.code);
+		assignments.push(`code = $${params.length}`);
+	}
+	if (fields.idProgram !== undefined) {
+		params.push(fields.idProgram);
+		assignments.push(`id_program = $${params.length}`);
 	}
 	if (fields.description !== undefined) {
-		assignments.push('description = ?');
 		params.push(fields.description);
+		assignments.push(`description = $${params.length}`);
 	}
 	if (fields.baseUrl !== undefined) {
-		assignments.push('base_url = ?');
 		params.push(fields.baseUrl);
+		assignments.push(`base_url = $${params.length}`);
+	}
+	if (fields.repoUrl !== undefined) {
+		params.push(fields.repoUrl);
+		assignments.push(`repo_url = $${params.length}`);
 	}
 	if (fields.isActive !== undefined) {
-		assignments.push('is_active = ?');
-		params.push(fields.isActive ? 1 : 0);
+		params.push(Boolean(fields.isActive));
+		assignments.push(`is_active = $${params.length}`);
 	}
 
-	if (assignments.length === 0) return;
-
 	params.push(idProject);
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		`UPDATE qa_project SET ${assignments.join(', ')} WHERE id_project = ?`,
-		params
-	);
+	const programIds = fields.programIds !== undefined
+		? fields.programIds
+		: fields.idProgram !== undefined
+			? fields.idProgram ? [fields.idProgram] : []
+			: undefined;
+
+	await postgresConnection.transaction(async (client) => {
+		await client.query(
+			`UPDATE projects SET ${assignments.join(', ')} WHERE id_project = $${params.length}`,
+			params
+		);
+		if (programIds !== undefined) await syncProjectPrograms(client, idProject, programIds);
+	});
 };
 
 export const setProjectActive = async (idProject: number, isActive: boolean): Promise<void> => {
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		'UPDATE qa_project SET is_active = ? WHERE id_project = ?',
-		[isActive ? 1 : 0, idProject]
+	await postgresConnection.raw(
+		'UPDATE projects SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE id_project = $2',
+		[Boolean(isActive), idProject]
 	);
 };
 
 export const deleteProjectPermanently = async (idProject: number): Promise<void> => {
-	try {
-		await mysqlConnection.raw<MySqlResultSetHeader>(
-			'DELETE FROM qa_user_project WHERE id_project = ?',
-			[idProject]
-		);
-	} catch {
-		// ignore
-	}
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		'DELETE FROM qa_project WHERE id_project = ?',
+	await postgresConnection.raw(
+		'DELETE FROM projects WHERE id_project = $1',
 		[idProject]
 	);
 };

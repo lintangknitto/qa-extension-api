@@ -19,6 +19,16 @@ router.get(
 );
 
 router.get(
+	['/sessions/active', '/api/v1/sessions/active'],
+	requestHandler(controller.getActive)
+);
+
+router.post(
+	['/sessions/active/discard', '/api/v1/sessions/active/discard', '/sessions/discard-active'],
+	requestHandler(controller.discardActive)
+);
+
+router.get(
 	'/sessions/:id_session',
 	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
 	requestHandler(controller.detail)

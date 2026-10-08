@@ -1,4 +1,4 @@
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 
 export interface ISessionFilter {
 	idProject?: number;
@@ -45,9 +45,9 @@ const buildFilter = (filter: ISessionFilter): { where: string; params: unknown[]
 };
 
 export const findSessionById = async (idSession: number): Promise<Entity.IQaRecordingSession | null> => {
-	const [row] = await mysqlConnection.raw<Entity.IQaRecordingSession[]>(
-		'SELECT * FROM qa_recording_session WHERE id_session = ? LIMIT 1',
-		[idSession]
+	const [row] = await postgresConnection.raw<Entity.IQaRecordingSession[]>(
+		'SELECT * FROM recording_sessions WHERE id_session = ? LIMIT 1',
+		[Number(idSession)]
 	);
 	return row ?? null;
 };
@@ -55,8 +55,8 @@ export const findSessionById = async (idSession: number): Promise<Entity.IQaReco
 export const findSessionByShareToken = async (
 	shareToken: string
 ): Promise<Entity.IQaRecordingSession | null> => {
-	const [row] = await mysqlConnection.raw<Entity.IQaRecordingSession[]>(
-		'SELECT * FROM qa_recording_session WHERE share_token = ? LIMIT 1',
+	const [row] = await postgresConnection.raw<Entity.IQaRecordingSession[]>(
+		'SELECT * FROM recording_sessions WHERE share_token = ? LIMIT 1',
 		[shareToken]
 	);
 	return row ?? null;
@@ -65,9 +65,9 @@ export const findSessionByShareToken = async (
 export const findActiveSessionByOwner = async (
 	ownerUserId: number
 ): Promise<Entity.IQaRecordingSession | null> => {
-	const [row] = await mysqlConnection.raw<Entity.IQaRecordingSession[]>(
-		"SELECT * FROM qa_recording_session WHERE owner_user_id = ? AND status = 'recording' LIMIT 1",
-		[ownerUserId]
+	const [row] = await postgresConnection.raw<Entity.IQaRecordingSession[]>(
+		"SELECT * FROM recording_sessions WHERE owner_user_id = ? AND status = 'recording' ORDER BY id_session DESC LIMIT 1",
+		[Number(ownerUserId)]
 	);
 	return row ?? null;
 };
@@ -78,17 +78,16 @@ export const listSessions = async (options: {
 	filter: ISessionFilter;
 }): Promise<Entity.IQaRecordingSession[]> => {
 	const { where, params } = buildFilter(options.filter);
-	// perPage & offset sudah integer tervalidasi dari normalizePagination.
-	return mysqlConnection.raw<Entity.IQaRecordingSession[]>(
-		`SELECT * FROM qa_recording_session ${where} ORDER BY created_at DESC, id_session DESC LIMIT ${options.perPage} OFFSET ${options.offset}`,
+	return postgresConnection.raw<Entity.IQaRecordingSession[]>(
+		`SELECT * FROM recording_sessions ${where} ORDER BY created_at DESC, id_session DESC LIMIT ${options.perPage} OFFSET ${options.offset}`,
 		params
 	);
 };
 
 export const countSessions = async (filter: ISessionFilter): Promise<number> => {
 	const { where, params } = buildFilter(filter);
-	const [row] = await mysqlConnection.raw<Array<{ total: number }>>(
-		`SELECT COUNT(*) AS total FROM qa_recording_session ${where}`,
+	const [row] = await postgresConnection.raw<Array<{ total: string | number }>>(
+		`SELECT COUNT(*) AS total FROM recording_sessions ${where}`,
 		params
 	);
 	return Number(row?.total ?? 0);
@@ -97,7 +96,7 @@ export const countSessions = async (filter: ISessionFilter): Promise<number> => 
 export const listCheckpointsBySession = async (
 	idSession: number
 ): Promise<Entity.IQaRecordingCheckpoint[]> =>
-	mysqlConnection.raw<Entity.IQaRecordingCheckpoint[]>(
-		'SELECT * FROM qa_recording_checkpoint WHERE id_session = ? ORDER BY created_at ASC, id_checkpoint ASC',
+	postgresConnection.raw<Entity.IQaRecordingCheckpoint[]>(
+		'SELECT * FROM recording_checkpoints WHERE id_session = ? ORDER BY created_at ASC, id_checkpoint ASC',
 		[idSession]
 	);

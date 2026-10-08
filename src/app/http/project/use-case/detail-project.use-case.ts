@@ -9,7 +9,8 @@ export const detailProjectUseCase = async (ctx: {
 	const project = domain.assertProjectExists(await queries.findProjectById(ctx.idProject));
 
 	// Project non-aktif hanya boleh dilihat QA/admin.
-	if (project.is_active !== 1) domain.assertCanManageProjects(ctx.userLevel, PROJECT_ADMIN_LEVELS);
+	const isProjectActive = project.is_active === true || project.is_active === 1;
+	if (!isProjectActive) domain.assertCanManageProjects(ctx.userLevel, PROJECT_ADMIN_LEVELS);
 
 	return domain.toProjectResponse(project);
 };

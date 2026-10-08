@@ -1,21 +1,25 @@
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
 import packageJson from '../../../package.json';
 
 export const APP_NAME = packageJson.name || 'knitto-rest';
 export const APP_VERSION = packageJson.version || '0.0.0';
 
 export const NODE_ENV = process.env.NODE_ENV ?? 'development';
-export const DEBUG_QUERY = process.env.DEBUG_QUERY ?? 'true';
-export const APP_SECRET_KEY = process.env.APP_SECRET_KEY || 'secret';
-export const APP_PORT_HTTP = String(process.env.APP_PORT_HTTP) || '8000';
+export const DEBUG_QUERY = process.env.DEBUG_QUERY ?? 'false';
+export const APP_SECRET_KEY = process.env.APP_SECRET_KEY || '';
+export const APP_PORT_HTTP = process.env.APP_PORT_HTTP || '8000';
 
 export const OPENAPI_DOCS_ENABLED = process.env.OPENAPI_DOCS_ENABLED === 'true';
 
-export const mysqlConfig = {
-	HOST: process.env.DB_HOST_MYSQL || 'localhost',
-	NAME: process.env.DB_NAME_MYSQL || 'db',
-	USER: process.env.DB_USER_MYSQL || 'root',
-	PORT: process.env.DB_PORT_MYSQL || 3306,
-	PASSWORD: process.env.DB_PASS_MYSQL || ''
+export const postgresConfig = {
+	HOST: process.env.POSTGRES_HOST || process.env.DB_HOST_POSTGRES || 'localhost',
+	PORT: Number(process.env.POSTGRES_PORT || process.env.DB_PORT_POSTGRES || 5432),
+	USER: process.env.POSTGRES_USER || process.env.DB_USER_POSTGRES || 'postgres',
+	PASSWORD: process.env.POSTGRES_PASSWORD || process.env.DB_PASS_POSTGRES || 'postgres',
+	NAME: process.env.POSTGRES_DB || process.env.DB_NAME_POSTGRES || 'knitto_qa'
 };
 
 export const rabbitMQConfig = {
@@ -63,11 +67,29 @@ export const recordingConfig = {
 	)
 };
 
-/**
- * Level user yang boleh mengelola master project. Dibuat konfigurabel karena
- * daftar level dapat berbeda antar deployment.
- */
 export const PROJECT_ADMIN_LEVELS = csv(
 	process.env.PROJECT_ADMIN_LEVELS,
 	'ADMIN,QA,SUPERADMIN,IMPLEMENTOR'
 ).map((level) => level.toUpperCase());
+
+export const embeddingConfig = {
+	BASE_URL: process.env.EMBEDDING_BASE_URL || 'http://192.168.20.15:20128/v1',
+	API_KEY: process.env.EMBEDDING_API_KEY || '',
+	MODEL: process.env.EMBEDDING_MODEL || 'openrouter/openai/text-embedding-3-small',
+	DIMENSIONS: Number(process.env.EMBEDDING_DIMENSIONS || 1536)
+};
+
+export const grafanaConfig = {
+	URL: process.env.GRAFANA_URL || 'http://192.168.20.15:3800',
+	SERVICE_ACCOUNT_TOKEN: process.env.GRAFANA_SERVICE_ACCOUNT_TOKEN || '',
+	LOKI_UID: process.env.GRAFANA_LOKI_UID || 'P8E80F9AEF21F6940',
+	PROMETHEUS_UID: process.env.GRAFANA_PROMETHEUS_UID || 'PBFA97CFB590B2093',
+	TEMPO_UID: process.env.GRAFANA_TEMPO_UID || 'efh5mi0xofqioe',
+	ALLOW_ANNOTATION: process.env.ALLOW_ANNOTATION_OPERATION === 'true',
+	ALLOW_SILENCE: process.env.ALLOW_SILENCE_OPERATION === 'true'
+};
+
+export const githubConfig = {
+	TOKEN: process.env.GITHUB_TOKEN || ''
+};
+

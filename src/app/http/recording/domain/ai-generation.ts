@@ -34,7 +34,7 @@ const SYSTEM_PROMPTS: Record<TGenerationKind, string> = {
 		'Kamu adalah QA Automation Engineer handal yang mengonversi rekaman interaksi tester menjadi skrip otomasi Playwright (TypeScript, @playwright/test) yang 100% executable dan akurat mereplikasi gerakan tester.',
 		'ATURAN UTAMA:',
 		'1. Buat test lengkap: import { test, expect } from "@playwright/test"; test("...", async ({ page }) => { ... });',
-		'2. Buka URL target di awal dengan `await page.goto(...)` sesuai target URL atau event navigasi pertama.',
+		'2. Buka URL target di awal dengan `await page.goto(...)` sesuai Target URL Frontend Aktual atau event navigasi web pertama. JANGAN PERNAH membuka URL API backend (seperti endpoint REST/domain yang diawali api-) karena browser sedang menguji UI frontend.',
 		'3. Ikuti urutan langkah tester secara kronologis dan presisi 1:1. Gunakan `Primary Locator` yang tercantum di setiap langkah.',
 		'4. Gunakan Playwright locators standar: page.getByTestId(), page.getByRole(), page.getByLabel(), page.getByPlaceholder(), page.getByText(), atau page.locator().',
 		'5. Prioritaskan locator semantik (getByRole, getByPlaceholder, getByTestId, getByLabel) daripada selector CSS path turunan (seperti div > svg > path) jika tombol/elemen interaktif induknya teridentifikasi.',

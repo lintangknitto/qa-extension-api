@@ -16,11 +16,21 @@ export const createProjectUseCase = async (ctx: {
 	const existing = await queries.findProjectByCode(code);
 	if (existing) throw new InvalidParameterException('Kode project sudah dipakai.');
 
+	const programIds = Array.isArray(ctx.input.program_ids) && ctx.input.program_ids.length > 0
+		? ctx.input.program_ids
+		: ctx.input.id_program
+			? [Number(ctx.input.id_program)]
+			: [];
+	const primaryProgramId = programIds[0] ?? (ctx.input.id_program ? Number(ctx.input.id_program) : null);
+
 	const idProject = await repo.insertProject({
 		name: ctx.input.name,
 		code,
+		idProgram: primaryProgramId,
+		programIds,
 		description: ctx.input.description ?? null,
 		baseUrl: ctx.input.base_url ?? null,
+		repoUrl: ctx.input.repo_url ?? null,
 		isActive: ctx.input.is_active ?? true,
 		createdByUserId: ctx.userId
 	});
