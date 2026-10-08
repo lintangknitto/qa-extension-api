@@ -1,0 +1,69 @@
+import { DisposableStack } from '../disposable-stack';
+import { execSync } from 'child_process';
+
+describe('DisposableStack Lifecycle & Safety Guard', () => {
+	// Timeout cukup untuk spin up compose container
+	jest.setTimeout(60000);
+
+	it('menolak konfigurasi database knitto_qa persisten', () => {
+		expect(() => {
+			new DisposableStack({ postgresDb: 'knitto_qa' });
+		}).toThrow(/SAFETY GUARD VIOLATION: Dilarang menghubungkan E2E harness ke database persisten knitto_qa/);
+	});
+
+	it('menolak port 5432 pada localhost', () => {
+		const stack = new DisposableStack({ postgresDb: 'safe_test_db' });
+		expect(() => {
+			stack.assertSafety({ postgresPort: 5432, postgresHost: '127.0.0.1' });
+		}).toThrow(/SAFETY GUARD VIOLATION: Dilarang memakai port default PostgreSQL persisten 5432/);
+	});
+
+	it('dapat start dan teardown stack disposable tanpa mengganggu persistent container', async () => {
+		const stack = new DisposableStack();
+		const projectName = stack.getProjectName();
+
+		try {
+			const endpoints = await stack.start();
+			expect(endpoints.postgres.port).toBeGreaterThan(0);
+			expect(endpoints.postgres.port).not.toBe(5432);
+			expect(endpoints.minio.port).toBeGreaterThan(0);
+			expect(endpoints.minio.port).not.toBe(9000);
+			expect(endpoints.mockAi.port).toBeGreaterThan(0);
+
+			// Pastikan project name terisolasi di docker
+			const psOutput = execSync(`docker compose -p "${projectName}" -f dev-infra/docker-compose.e2e.yml ps -q`, {
+				encoding: 'utf-8'
+			}).trim();
+			expect(psOutput.split('\n').filter(Boolean).length).toBe(3);
+		} finally {
+			await stack.stop();
+		}
+
+		// Verifikasi seluruh service dan volume telah dibersihkan
+		const afterPsOutput = execSync(`docker compose -p "${projectName}" -f dev-infra/docker-compose.e2e.yml ps -q`, {
+			encoding: 'utf-8'
+		}).trim();
+		expect(afterPsOutput).toBe('');
+	});
+
+	it('membersihkan stack saat terjadi forced failure di tengah alur', async () => {
+		const stack = new DisposableStack();
+		const projectName = stack.getProjectName();
+
+		try {
+			await stack.start();
+			// Simulasi forced failure
+			throw new Error('Simulasi error tak terduga pada E2E test step');
+		} catch (err) {
+			expect((err as Error).message).toContain('Simulasi error');
+		} finally {
+			await stack.stop();
+		}
+
+		// Pastikan teardown tetap dieksekusi walau ada error
+		const afterPs = execSync(`docker compose -p "${projectName}" -f dev-infra/docker-compose.e2e.yml ps -q`, {
+			encoding: 'utf-8'
+		}).trim();
+		expect(afterPs).toBe('');
+	});
+});
