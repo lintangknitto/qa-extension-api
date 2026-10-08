@@ -6,7 +6,10 @@ import {
 import {
 	presignSessionVideoUseCase,
 	completeSessionVideoUseCase,
-	getSessionVideoUrlUseCase
+	getSessionVideoUrlUseCase,
+	parseVideoRange,
+	videoObjectKeyFromUrl,
+	streamSharedSessionVideoUseCase
 } from '../../use-case/session-video.use-case';
 import * as sessionQueries from '../../queries/session.queries';
 import * as sessionRepo from '../../repo/session.repo';
@@ -176,6 +179,56 @@ describe('Session Video Use Cases (MinIO)', () => {
 					userLevel: 'QA'
 				})
 			).rejects.toThrow(NotFoundException);
+		});
+	});
+
+	describe('videoObjectKeyFromUrl', () => {
+		it('mengambil object key dari presigned URL host mana pun, tanpa query tanda tangan', () => {
+			expect(videoObjectKeyFromUrl('http://127.0.0.1:9000/qa-recording-artifacts/sessions/1/5-video-1.webm?X-Amz-Signature=a')).toBe('sessions/1/5-video-1.webm');
+			expect(videoObjectKeyFromUrl('http://192.168.21.38:9000/qa-recording-artifacts/sessions/0/7-video-2.webm')).toBe('sessions/0/7-video-2.webm');
+			expect(videoObjectKeyFromUrl('blob:chrome-extension://x/abc')).toBeNull();
+		});
+	});
+
+	describe('parseVideoRange', () => {
+		it('tanpa header Range → kirim utuh', () => {
+			expect(parseVideoRange(undefined, 1000)).toBeNull();
+			expect(parseVideoRange('bytes=-', 1000)).toBeNull();
+		});
+		it('rentang terbuka, tertutup, dan suffix', () => {
+			expect(parseVideoRange('bytes=0-', 1000)).toEqual({ start: 0, end: 999 });
+			expect(parseVideoRange('bytes=100-199', 1000)).toEqual({ start: 100, end: 199 });
+			expect(parseVideoRange('bytes=900-5000', 1000)).toEqual({ start: 900, end: 999 });
+			expect(parseVideoRange('bytes=-100', 1000)).toEqual({ start: 900, end: 999 });
+		});
+		it('rentang di luar ukuran file → unsatisfiable (416)', () => {
+			expect(parseVideoRange('bytes=1000-', 1000)).toBe('unsatisfiable');
+			expect(parseVideoRange('bytes=500-100', 1000)).toBe('unsatisfiable');
+		});
+	});
+
+	describe('streamSharedSessionVideoUseCase', () => {
+		const shared = { ...mockSession, video_url: 'http://127.0.0.1:9000/qa-recording-artifacts/sessions/10/1-video-123.webm?X-Amz-Signature=abc' };
+
+		it('stream lewat share token memakai object key dari video_url, dengan Range parsial', async () => {
+			(sessionQueries.findSessionByShareToken as jest.Mock).mockResolvedValue(shared);
+			(minioClient.statArtifactObject as jest.Mock).mockResolvedValue({ size: 1000, metaData: { 'content-type': 'video/webm' } });
+			(minioClient.getArtifactObjectRange as jest.Mock).mockResolvedValue('partial-stream');
+
+			const video = await streamSharedSessionVideoUseCase({ shareToken: 'tok', range: 'bytes=100-' });
+			expect(minioClient.statArtifactObject).toHaveBeenCalledWith('sessions/10/1-video-123.webm');
+			expect(minioClient.getArtifactObjectRange).toHaveBeenCalledWith('sessions/10/1-video-123.webm', 100, 900);
+			expect(video).toMatchObject({ kind: 'partial', size: 1000, range: { start: 100, end: 999 } });
+		});
+
+		it('share token tidak dikenal → NotFoundException', async () => {
+			(sessionQueries.findSessionByShareToken as jest.Mock).mockResolvedValue(null);
+			await expect(streamSharedSessionVideoUseCase({ shareToken: 'x' })).rejects.toThrow(NotFoundException);
+		});
+
+		it('sesi tanpa video → NotFoundException', async () => {
+			(sessionQueries.findSessionByShareToken as jest.Mock).mockResolvedValue(mockSession);
+			await expect(streamSharedSessionVideoUseCase({ shareToken: 'tok' })).rejects.toThrow(NotFoundException);
 		});
 	});
 });
