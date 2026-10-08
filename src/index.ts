@@ -4,30 +4,30 @@ import './libs/helpers/initModuleAlias';
 import { dump } from '@knittotextile/knitto-core-backend';
 import httpServer from '@http/index';
 
-// import messageBroker from '@/app/messageBroker';
-import mysqlConnection from './libs/config/mysqlConnection';
-import { RECORDING_FEATURE_ENABLED } from './libs/config';
+import postgresConnection from './libs/config/postgresConnection';
+import { APP_SECRET_KEY, RECORDING_FEATURE_ENABLED } from './libs/config';
 import {
 	assertRecordingInfraConfigured,
 	currentRecordingInfraSettings
 } from './libs/config/recording-infra';
-import { ensureDatabaseSchema } from './libs/config/init-database-schema';
-// import rabbitConnection from './libs/config/rabbitConnection';
 
 (
 	async () => {
-		try {
+	try {
+		if (APP_SECRET_KEY.length < 32) {
+			throw new Error('APP_SECRET_KEY harus diisi dengan secret minimal 32 karakter.');
+		}
+
 			// Fitur recording wajib punya konfigurasi AI + MinIO lengkap saat diaktifkan.
 			if (RECORDING_FEATURE_ENABLED) assertRecordingInfraConfigured(currentRecordingInfraSettings());
 
-			// start infrastructure
-			await mysqlConnection.init();
-			await ensureDatabaseSchema();
-			// await rabbitConnection.init();
+			// Verify postgres connection
+			const pool = await postgresConnection.getPool();
+			await pool.query('SELECT 1');
+			console.log('✅ PostgreSQL connection pool initialized.');
 
 			// start application
 			await httpServer();
-			// await messageBroker();
 		} catch (error) {
 			dump(error);
 			process.exit(1);

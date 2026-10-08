@@ -1,4 +1,4 @@
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 
 export interface IUserFilter {
 	search?: string;
@@ -11,7 +11,7 @@ const buildFilter = (filter: IUserFilter): { where: string; params: unknown[] } 
 	const params: unknown[] = [];
 
 	if (filter.search) {
-		clauses.push('(nama LIKE ? OR username LIKE ?)');
+		clauses.push('(nama ILIKE ? OR username ILIKE ?)');
 		const like = `%${filter.search}%`;
 		params.push(like, like);
 	}
@@ -22,9 +22,8 @@ const buildFilter = (filter: IUserFilter): { where: string; params: unknown[] } 
 	}
 
 	if (filter.isActive !== undefined) {
-		clauses.push('(is_active = ? OR (is_active IS NULL AND aktif = ?))');
-		const val = filter.isActive ? 1 : 0;
-		params.push(val, val);
+		clauses.push('is_active = ?');
+		params.push(Boolean(filter.isActive));
 	}
 
 	return {
@@ -34,16 +33,16 @@ const buildFilter = (filter: IUserFilter): { where: string; params: unknown[] } 
 };
 
 export const findUserById = async (idUser: number): Promise<Entity.IUser | null> => {
-	const [user] = await mysqlConnection.raw<Entity.IUser[]>(
-		'SELECT * FROM user WHERE id_user = ? LIMIT 1',
+	const [user] = await postgresConnection.raw<Entity.IUser[]>(
+		'SELECT id_user, nama, username, password, level, is_active, created_at, updated_at FROM users WHERE id_user = ? LIMIT 1',
 		[idUser]
 	);
 	return user ?? null;
 };
 
 export const findUserByUsername = async (username: string): Promise<Entity.IUser | null> => {
-	const [user] = await mysqlConnection.raw<Entity.IUser[]>(
-		'SELECT * FROM user WHERE username = ? LIMIT 1',
+	const [user] = await postgresConnection.raw<Entity.IUser[]>(
+		'SELECT id_user, nama, username, password, level, is_active, created_at, updated_at FROM users WHERE username = ? LIMIT 1',
 		[username]
 	);
 	return user ?? null;
@@ -57,16 +56,16 @@ export const listUsers = async (options: {
 	isActive?: boolean;
 }): Promise<Entity.IUser[]> => {
 	const { where, params } = buildFilter(options);
-	return mysqlConnection.raw<Entity.IUser[]>(
-		`SELECT id_user, nama, username, level, is_active, aktif, created_at, updated_at FROM user ${where} ORDER BY id_user ASC LIMIT ${options.perPage} OFFSET ${options.offset}`,
+	return postgresConnection.raw<Entity.IUser[]>(
+		`SELECT id_user, nama, username, level, is_active, created_at, updated_at FROM users ${where} ORDER BY id_user ASC LIMIT ${options.perPage} OFFSET ${options.offset}`,
 		params
 	);
 };
 
 export const countUsers = async (filter: IUserFilter): Promise<number> => {
 	const { where, params } = buildFilter(filter);
-	const [row] = await mysqlConnection.raw<Array<{ total: number }>>(
-		`SELECT COUNT(*) AS total FROM user ${where}`,
+	const [row] = await postgresConnection.raw<Array<{ total: string | number }>>(
+		`SELECT COUNT(*) AS total FROM users ${where}`,
 		params
 	);
 	return Number(row?.total ?? 0);
@@ -74,8 +73,8 @@ export const countUsers = async (filter: IUserFilter): Promise<number> => {
 
 export const getUserAssignedProjectIds = async (idUser: number): Promise<number[]> => {
 	try {
-		const rows = await mysqlConnection.raw<Array<{ id_project: number }>>(
-			'SELECT id_project FROM qa_user_project WHERE id_user = ?',
+		const rows = await postgresConnection.raw<Array<{ id_project: number | string }>>(
+			'SELECT id_project FROM user_projects WHERE id_user = ?',
 			[idUser]
 		);
 		return rows.map((r) => Number(r.id_project));
@@ -87,8 +86,8 @@ export const getUserAssignedProjectIds = async (idUser: number): Promise<number[
 export const countUserAssociatedData = async (idUser: number): Promise<number> => {
 	let total = 0;
 	try {
-		const [tcRow] = await mysqlConnection.raw<Array<{ total: number }>>(
-			'SELECT COUNT(*) AS total FROM qa_test_case WHERE created_by_user_id = ?',
+		const [tcRow] = await postgresConnection.raw<Array<{ total: string | number }>>(
+			'SELECT COUNT(*) AS total FROM test_cases WHERE created_by_user_id = ?',
 			[idUser]
 		);
 		total += Number(tcRow?.total ?? 0);
@@ -97,8 +96,8 @@ export const countUserAssociatedData = async (idUser: number): Promise<number> =
 	}
 
 	try {
-		const [sessRow] = await mysqlConnection.raw<Array<{ total: number }>>(
-			'SELECT COUNT(*) AS total FROM qa_recording_session WHERE owner_user_id = ?',
+		const [sessRow] = await postgresConnection.raw<Array<{ total: string | number }>>(
+			'SELECT COUNT(*) AS total FROM recording_sessions WHERE owner_user_id = ?',
 			[idUser]
 		);
 		total += Number(sessRow?.total ?? 0);

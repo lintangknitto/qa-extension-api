@@ -26,6 +26,11 @@ describe('socket-auth', () => {
 			expect(decodeSocketToken(token, TEST_SECRET)).toEqual({ id_user: 42 });
 		});
 
+		it('mengembalikan id_user berupa angka bila payload berupa string numeric', () => {
+			const token = jwt.sign({ id_user: '1' }, TEST_SECRET, { expiresIn: '1h' });
+			expect(decodeSocketToken(token, TEST_SECRET)).toEqual({ id_user: 1 });
+		});
+
 		it('melempar untuk token dengan secret berbeda', () => {
 			const token = jwt.sign({ id_user: 42 }, 'secret-lain', { expiresIn: '1h' });
 			expect(() => decodeSocketToken(token, TEST_SECRET)).toThrow();

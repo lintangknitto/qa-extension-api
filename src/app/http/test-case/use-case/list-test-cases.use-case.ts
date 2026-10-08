@@ -20,6 +20,7 @@ export const listTestCasesUseCase = async (ctx: {
 		status: ctx.filter.status,
 		feature: ctx.filter.feature,
 		test_type: ctx.filter.test_type,
+		id_program: ctx.filter.id_program ? Number(ctx.filter.id_program) : undefined,
 		limit,
 		offset
 	};

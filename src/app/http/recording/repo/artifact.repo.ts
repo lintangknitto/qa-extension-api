@@ -1,5 +1,4 @@
-import { MySqlResultSetHeader } from '@knittotextile/knitto-mysql/dist/libs/MySqlConnector';
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 
 export const insertArtifact = async (fields: {
 	idSession: number;
@@ -9,9 +8,10 @@ export const insertArtifact = async (fields: {
 	sizeBytes: number;
 	sequence?: number | null;
 }): Promise<number> => {
-	const result = await mysqlConnection.raw<MySqlResultSetHeader>(
-		`INSERT INTO qa_recording_artifact (id_session, kind, object_key, content_type, size_bytes, sequence, status)
-		 VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+	const [row] = await postgresConnection.raw<Array<{ id_artifact: number | string }>>(
+		`INSERT INTO recording_artifacts (id_session, kind, object_key, content_type, size_bytes, sequence, status, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'pending', CURRENT_TIMESTAMP)
+		 RETURNING id_artifact`,
 		[
 			fields.idSession,
 			fields.kind,
@@ -21,7 +21,7 @@ export const insertArtifact = async (fields: {
 			fields.sequence ?? null
 		]
 	);
-	return Number(result.insertId);
+	return Number(row?.id_artifact);
 };
 
 export const markArtifactUploaded = async (
@@ -32,17 +32,17 @@ export const markArtifactUploaded = async (
 	const params: unknown[] = [];
 
 	if (fields.sizeBytes !== undefined) {
-		assignments.push('size_bytes = ?');
 		params.push(fields.sizeBytes);
+		assignments.push(`size_bytes = $${params.length}`);
 	}
 	if (fields.checksumSha256 !== undefined && fields.checksumSha256 !== null) {
-		assignments.push('checksum_sha256 = ?');
 		params.push(fields.checksumSha256);
+		assignments.push(`checksum_sha256 = $${params.length}`);
 	}
 
 	params.push(idArtifact);
-	await mysqlConnection.raw<MySqlResultSetHeader>(
-		`UPDATE qa_recording_artifact SET ${assignments.join(', ')} WHERE id_artifact = ?`,
+	await postgresConnection.raw(
+		`UPDATE recording_artifacts SET ${assignments.join(', ')} WHERE id_artifact = $${params.length}`,
 		params
 	);
 };

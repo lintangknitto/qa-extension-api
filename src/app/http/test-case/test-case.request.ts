@@ -1,9 +1,11 @@
 import {
+	any,
 	array,
 	InferOutput,
 	integer,
 	maxLength,
 	minValue,
+	nullish,
 	object,
 	optional,
 	pipe,
@@ -44,11 +46,22 @@ export const testCaseParamValidation = object({
 });
 export type TTestCaseParamValidation = InferOutput<typeof testCaseParamValidation>;
 
+const programIdSchema = pipe(
+	any(),
+	transform((value): number | null => (value === null || value === undefined || value === '' ? null : Number(value)))
+);
+
 export const listTestCaseValidation = object({
 	search: optional(string(ERROR_VALIDATION_MSG.string('Pencarian'))),
 	status: optional(string(ERROR_VALIDATION_MSG.string('Status'))),
 	feature: optional(string(ERROR_VALIDATION_MSG.string('Feature'))),
 	test_type: optional(string(ERROR_VALIDATION_MSG.string('Tipe Test'))),
+	id_program: optional(
+		pipe(
+			any(),
+			transform((value): number | undefined => (value === undefined || value === '' ? undefined : Number(value)))
+		)
+	),
 	page: optional(
 		pipe(
 			string(ERROR_VALIDATION_MSG.string('Page')),
@@ -71,6 +84,7 @@ export const listTestCaseValidation = object({
 export type TListTestCaseValidation = InferOutput<typeof listTestCaseValidation>;
 
 export const singleTestCaseItemValidation = object({
+	id_program: optional(nullish(programIdSchema)),
 	test_case_id: pipe(
 		string(ERROR_VALIDATION_MSG.string('Test Case ID')),
 		maxLength(80, ERROR_VALIDATION_MSG.maxLength('Test Case ID', 80))
@@ -100,6 +114,7 @@ export const createTestCaseValidation = singleTestCaseItemValidation;
 export type TCreateTestCaseValidation = InferOutput<typeof createTestCaseValidation>;
 
 export const updateTestCaseValidation = object({
+	id_program: optional(nullish(programIdSchema)),
 	test_case_id: optional(pipe(string(), maxLength(80))),
 	title: optional(pipe(string(), maxLength(255))),
 	group_no: optional(pipe(string(), maxLength(50))),

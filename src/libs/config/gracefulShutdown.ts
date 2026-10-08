@@ -4,10 +4,6 @@ import GracefulShutdown from '@/libs/GracefulShutdown';
 
 const gracefulShutdown = new GracefulShutdown();
 
-// gracefulShutdown.register('MySQL Database', async () => {
-// 	await mysqlConnection.poolConnection.end();
-// });
-
 // Uncomment jika service menggunakan RabbitMQ
 // gracefulShutdown.register('RabbitMQ', async () => {
 // 	await rabbitConnection.shutdown(10000); // Timeout 10 seconds

@@ -11,7 +11,7 @@ describe('auth.domain', () => {
 				level: 'IMPLEMENTOR'
 			} as const satisfies Partial<Entity.IUser> as Entity.IUser;
 
-			const token = domain.generateToken(user);
+			const token = domain.generateToken(user, 'unit-test-secret-with-sufficient-entropy');
 
 			expect(token).toBeDefined();
 			expect(typeof token).toBe('string');

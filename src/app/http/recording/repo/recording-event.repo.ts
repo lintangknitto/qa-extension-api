@@ -1,10 +1,9 @@
-import { MySqlResultSetHeader } from '@knittotextile/knitto-mysql/dist/libs/MySqlConnector';
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 import type { INormalizedRecordingEvent } from '../domain/recording-event.contract';
 
 /**
- * INSERT IGNORE menjadikan unique key (id_session, sequence) sebagai pengaman
- * terakhir terhadap duplikat, meski pengecekan aplikasi sudah dilakukan.
+ * ON CONFLICT (id_session, sequence) DO NOTHING menjadikan unique key sebagai pengaman
+ * terakhir terhadap duplikat.
  */
 export const insertEventsBatch = async (
 	idSession: number,
@@ -12,25 +11,25 @@ export const insertEventsBatch = async (
 ): Promise<number> => {
 	if (events.length === 0) return 0;
 
-	const placeholders = events.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
-	const params: unknown[] = [];
-
+	let insertedCount = 0;
 	for (const event of events) {
-		params.push(
-			idSession,
-			event.sequence,
-			event.type,
-			event.tabId,
-			event.url,
-			JSON.stringify(event.payload),
-			event.occurredAt
+		const res = await postgresConnection.raw<Array<{ id_event: number | string }>>(
+			`INSERT INTO recording_events (id_session, sequence, event_type, tab_id, url, payload, occurred_at, created_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+			 ON CONFLICT (id_session, sequence) DO NOTHING
+			 RETURNING id_event`,
+			[
+				idSession,
+				event.sequence,
+				event.type,
+				event.tabId ?? null,
+				event.url ?? null,
+				JSON.stringify(event.payload ?? {}),
+				event.occurredAt
+			]
 		);
+		if (res && res.length > 0) insertedCount++;
 	}
 
-	const result = await mysqlConnection.raw<MySqlResultSetHeader>(
-		`INSERT IGNORE INTO qa_recording_event (id_session, sequence, event_type, tab_id, url, payload, occurred_at) VALUES ${placeholders}`,
-		params
-	);
-
-	return Number(result.affectedRows ?? 0);
+	return insertedCount;
 };

@@ -1,5 +1,6 @@
 import {
 	any,
+	boolean,
 	InferOutput,
 	integer,
 	maxLength,
@@ -52,7 +53,8 @@ const createSessionValidation = object({
 	),
 	target_url: nullish(
 		pipe(string(ERROR_VALIDATION_MSG.string('Target URL')), maxLength(1000, ERROR_VALIDATION_MSG.maxLength('Target URL', 1000)))
-	)
+	),
+	force_end_previous: optional(boolean())
 });
 export type TCreateSessionValidation = InferOutput<typeof createSessionValidation>;
 

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { APP_SECRET_KEY } from '@/libs/config';
-import mysqlConnection from '@/libs/config/mysqlConnection';
+import postgresConnection from '@/libs/config/postgresConnection';
 
 export interface ISocketUser {
 	id_user: number;
@@ -26,15 +26,32 @@ export const extractSocketToken = (handshake: {
 };
 
 export const decodeSocketToken = (token: string, secret: string = APP_SECRET_KEY): { id_user: number } => {
-	const decoded = jwt.verify(token, secret) as { id_user?: number };
-	if (!decoded || typeof decoded.id_user !== 'number') throw new Error('Token tidak memuat id_user.');
-	return { id_user: decoded.id_user };
+	const decoded = jwt.verify(token, secret) as { id_user?: number | string };
+	const id = Number(decoded?.id_user);
+	if (!decoded || !id || Number.isNaN(id)) throw new Error('Token tidak memuat id_user.');
+	return { id_user: id };
 };
 
 export const loadUserForSocket = async (idUser: number): Promise<ISocketUser | null> => {
-	const [user] = await mysqlConnection.raw<ISocketUser[]>(
-		'SELECT id_user, nama, username, level FROM user WHERE id_user = ? LIMIT 1',
+	const [user] = await postgresConnection.raw<
+		Array<{
+			id_user: number | string;
+			nama: string;
+			username: string;
+			level: string;
+			is_active: boolean | number;
+		}>
+	>(
+		'SELECT id_user, nama, username, level, is_active FROM users WHERE id_user = ? LIMIT 1',
 		[idUser]
 	);
-	return user ?? null;
+	if (!user || (user.is_active !== undefined && (user.is_active === false || Number(user.is_active) === 0))) {
+		return null;
+	}
+	return {
+		id_user: Number(user.id_user),
+		username: user.username,
+		nama: user.nama,
+		level: user.level
+	};
 };

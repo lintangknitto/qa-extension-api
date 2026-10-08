@@ -12,14 +12,20 @@ export const createSessionUseCase = async (ctx: {
 	if (ctx.input.id_project) {
 		const project = await findProjectById(ctx.input.id_project);
 		if (!project) throw new NotFoundException('Project tidak ditemukan.');
-		if (project.is_active !== 1) throw new InvalidParameterException('Project tidak aktif.');
+		const isProjectActive = project.is_active === true || project.is_active === 1 || project.is_active === undefined;
+		if (!isProjectActive) throw new InvalidParameterException('Project tidak aktif.');
 	}
 
 	const active = await queries.findActiveSessionByOwner(ctx.userId);
-	if (active)
-		throw new InvalidParameterException(
-			'Masih ada session recording aktif. Akhiri session tersebut sebelum memulai yang baru.'
-		);
+	if (active) {
+		if (ctx.input.force_end_previous) {
+			await repo.discardActiveSessionsByOwner(ctx.userId);
+		} else {
+			throw new InvalidParameterException(
+				'Masih ada session recording aktif. Akhiri session tersebut sebelum memulai yang baru.'
+			);
+		}
+	}
 
 	const idSession = await repo.insertSession({
 		idProject: ctx.input.id_project ?? null,

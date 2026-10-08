@@ -249,12 +249,19 @@ export const buildAiSessionContext = (input: IAiSessionInput): string => {
 				.join('\n')
 			: '(tidak ada checkpoint)';
 
+	const actualNavUrl = input.events.find(
+		(e) => Boolean(e.url && (e.type === 'action' || e.type === 'navigate' || e.type === 'dom-snapshot') && !e.url.includes('/api/') && !e.url.includes('api-'))
+	)?.url;
+
 	return [
 		'## Identitas Test Case',
 		`Nomor: ${input.session.test_case_no ?? '-'}`,
 		`Judul: ${input.session.title ?? '-'}`,
 		`Deskripsi: ${input.session.description ?? '-'}`,
-		`Target URL: ${input.session.target_url ?? '-'}`,
+		`Target URL: ${actualNavUrl || input.session.target_url || '-'}`,
+		...(actualNavUrl && input.session.target_url && actualNavUrl !== input.session.target_url
+			? [`Target URL Frontend Aktual: ${actualNavUrl}`, `Target URL Sesi: ${input.session.target_url}`]
+			: []),
 		`Hasil: ${input.session.result ?? '-'}`,
 		`Actual result: ${input.session.actual_result ?? '-'}`,
 		'',

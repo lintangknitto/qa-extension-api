@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: "no"
+    ports:
+      - "${E2E_POSTGRES_PORT:-0}:5432"
+    environment:
+      POSTGRES_USER: ${E2E_POSTGRES_USER:-e2e_user}
+      POSTGRES_PASSWORD: ${E2E_POSTGRES_PASSWORD:-e2e_pass}
+      POSTGRES_DB: ${E2E_POSTGRES_DB:-e2e_db}
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${E2E_POSTGRES_USER:-e2e_user} -d ${E2E_POSTGRES_DB:-e2e_db}"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    restart: "no"
+    command: server /data --console-address ":9001"
+    ports:
+      - "${E2E_MINIO_PORT:-0}:9000"
+      - "${E2E_MINIO_CONSOLE_PORT:-0}:9001"
+    environment:
+      MINIO_ROOT_USER: ${E2E_MINIO_ACCESS_KEY:-e2e_minio_user}
+      MINIO_ROOT_PASSWORD: ${E2E_MINIO_SECRET_KEY:-e2e_minio_pass}
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  mock-ai:
+    image: node:20-alpine
+    restart: "no"
+    working_dir: /app
+    volumes:
+      - ./mock-ai:/app
+    ports:
+      - "${E2E_MOCK_AI_PORT:-0}:8080"
+    command: node server.js
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 20

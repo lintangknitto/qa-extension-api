@@ -20,6 +20,8 @@ module.exports = {
 	// coverageDirectory: 'coverage',
 	verbose: true,
 	testMatch: ['./__tests__/**/*.+(ts|js)', './**/*.spec.+(ts|js)'],
+	// E2E harness specs start Docker + Chromium; they run via `pnpm e2e:postgres`, not unit tests.
+	testPathIgnorePatterns: ['/node_modules/', '<rootDir>/dist/', '<rootDir>/tests/e2e/'],
 	moduleFileExtensions: ['ts', 'js'],
 	passWithNoTests: true,
 	moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, {

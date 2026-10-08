@@ -2,9 +2,9 @@ import jwt from 'jsonwebtoken';
 import { APP_SECRET_KEY } from '@/libs/config';
 import { InvalidParameterException, NotAuthorizationException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 
-export const generateToken = (user: Entity.IUser): string => jwt.sign(
+export const generateToken = (user: Entity.IUser, secret: string = APP_SECRET_KEY): string => jwt.sign(
 	{ id_user: user.id_user, nama: user.nama, username: user.username, level: user.level },
-	APP_SECRET_KEY,
+	secret,
 	{ expiresIn: '7d' }
 );
 

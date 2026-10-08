@@ -1,11 +1,40 @@
 declare namespace Entity {
+	interface IQaProgram {
+		id_program?: number
+		name?: string
+		code?: string
+		type?: 'FRONTEND' | 'SERVICE' | string
+		grafana_dashboard_url?: string | null
+		description?: string | null
+		base_url?: string | null
+		repo_url?: string | null
+		is_active?: boolean | number
+		created_by_user_id?: number | null
+		created_at?: string
+		updated_at?: string
+	}
+
 	interface IQaProject {
 		id_project?: number
+		id_program?: number | null
+		program_name?: string | null
+		program_code?: string | null
+		program_ids?: number[]
+		programs?: Array<{
+			id_program: number
+			name: string
+			code: string
+			type?: string
+			grafana_dashboard_url?: string | null
+			base_url?: string | null
+			repo_url?: string | null
+		}>
 		name?: string
 		code?: string
 		description?: string | null
 		base_url?: string | null
-		is_active?: number
+		repo_url?: string | null
+		is_active?: boolean | number
 		created_by_user_id?: number | null
 		created_at?: string
 		updated_at?: string
@@ -14,6 +43,9 @@ declare namespace Entity {
 	interface IQaTestCase {
 		id_test_case?: number
 		id_project?: number
+		id_program?: number | null
+		program_name?: string | null
+		program_code?: string | null
 		group_no?: string | null
 		feature?: string | null
 		process_no?: string | null
@@ -130,5 +162,46 @@ declare namespace Entity {
 		ip_addres?: string
 		created_at?: string
 		updated_at?: string
+	}
+
+	interface IQaCodebaseFile {
+		id_file?: number
+		id_project?: number
+		file_path?: string
+		file_hash?: string
+		language?: string
+		total_lines?: number
+		ast_summary?: Record<string, unknown> | string
+		created_at?: string
+		updated_at?: string
+	}
+
+	interface IQaCodebaseSymbol {
+		id_symbol?: number
+		id_file?: number
+		id_project?: number
+		name?: string
+		kind?: string
+		signature?: string | null
+		docstring?: string | null
+		start_line?: number
+		end_line?: number
+		scope_path?: string | null
+		metadata?: Record<string, unknown> | string
+		created_at?: string
+	}
+
+	interface IQaCodebaseChunk {
+		id_chunk?: number
+		id_file?: number
+		id_project?: number
+		chunk_type?: string
+		content?: string
+		start_line?: number
+		end_line?: number
+		embedding?: number[] | string
+		similarity?: number
+		metadata?: Record<string, unknown> | string
+		created_at?: string
 	}
 }
