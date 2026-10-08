@@ -17,6 +17,8 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+/test-results
+/playwright-report
 
 # IDEs and editors
 /.idea
@@ -40,3 +42,6 @@ mysql.env
 # Cursor pipeline run artifacts (local server)
 .cursor/runs/
 .cursor/automation/config.env
+
+# graphify knowledge-graph cache (local)
+graphify-out/
