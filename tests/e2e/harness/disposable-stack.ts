@@ -1,8 +1,11 @@
-import { execSync, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import path from 'path';
 import crypto from 'crypto';
 import { Pool } from 'pg';
 import * as Minio from 'minio';
+
+/** Only harness-generated compose projects; never a persistent one such as `dev-infra`. */
+const PROJECT_NAME_PATTERN = /^knitto-e2e-[a-z0-9-]+$/;
 
 export interface IDisposableStackConfig {
 	projectName?: string;
@@ -51,6 +54,13 @@ export class DisposableStack {
 		this.projectName = config.projectName || `knitto-e2e-${Date.now()}-${randomSuffix}`;
 		this.composeFile = path.resolve(__dirname, '../../../dev-infra/docker-compose.e2e.yml');
 
+		// SAFETY GUARD: `down -v` runs against this project, so it must never name a persistent compose project.
+		if (!PROJECT_NAME_PATTERN.test(this.projectName)) {
+			throw new Error(
+				`SAFETY GUARD VIOLATION: projectName "${this.projectName}" harus cocok ${PROJECT_NAME_PATTERN} agar down -v tidak menyentuh project persisten.`
+			);
+		}
+
 		const postgresUser = config.postgresUser || `e2e_user_${randomSuffix}`;
 		const postgresPassword = config.postgresPassword || `e2e_pass_${randomSuffix}`;
 		const postgresDb = config.postgresDb || `e2e_db_${randomSuffix}`;
@@ -61,24 +71,51 @@ export class DisposableStack {
 		// SAFETY GUARD: Dilarang menggunakan database atau kredensial produksi / lokal persisten
 		this.assertSafety({ postgresDb });
 
+		// Drop any E2E_* value inherited from the shell: an exported E2E_POSTGRES_PORT=5432 (or a persistent
+		// DB name) would otherwise flow straight into the compose file. Ports are always dynamic.
+		const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('E2E_')));
 		this.env = {
-			...process.env,
+			...inherited,
 			E2E_POSTGRES_USER: postgresUser,
 			E2E_POSTGRES_PASSWORD: postgresPassword,
 			E2E_POSTGRES_DB: postgresDb,
 			E2E_MINIO_ACCESS_KEY: minioAccessKey,
 			E2E_MINIO_SECRET_KEY: minioSecretKey,
-			E2E_MINIO_BUCKET: minioBucket
+			E2E_MINIO_BUCKET: minioBucket,
+			E2E_POSTGRES_PORT: '0',
+			E2E_MINIO_PORT: '0',
+			E2E_MINIO_CONSOLE_PORT: '0',
+			E2E_MOCK_AI_PORT: '0'
 		};
 	}
 
 	public assertSafety(params: { postgresDb?: string; postgresPort?: number; postgresHost?: string }): void {
-		if (params.postgresDb && params.postgresDb.toLowerCase() === 'knitto_qa') {
-			throw new Error('SAFETY GUARD VIOLATION: Dilarang menghubungkan E2E harness ke database persisten knitto_qa.');
+		if (params.postgresDb !== undefined) {
+			const db = params.postgresDb.toLowerCase();
+			if (db === 'knitto_qa') {
+				throw new Error('SAFETY GUARD VIOLATION: Dilarang menghubungkan E2E harness ke database persisten knitto_qa.');
+			}
+			if (!db.startsWith('e2e_')) {
+				throw new Error(`SAFETY GUARD VIOLATION: Nama database E2E harus berawalan "e2e_" (diterima: "${params.postgresDb}").`);
+			}
 		}
 		if (params.postgresPort === 5432 && (!params.postgresHost || params.postgresHost === 'localhost' || params.postgresHost === '127.0.0.1')) {
 			throw new Error('SAFETY GUARD VIOLATION: Dilarang memakai port default PostgreSQL persisten 5432.');
 		}
+	}
+
+	/** Run `docker compose` for this project with argv (no shell string interpolation). */
+	private compose(args: string[], stdio: 'pipe' | 'ignore' = 'pipe'): string {
+		const res = spawnSync('docker', ['compose', '-p', this.projectName, '-f', this.composeFile, ...args], {
+			env: this.env,
+			encoding: 'utf-8',
+			stdio: stdio === 'ignore' ? 'ignore' : ['ignore', 'pipe', 'pipe']
+		});
+		if (res.error) throw res.error;
+		if (res.status !== 0) {
+			throw new Error(`docker compose ${args.join(' ')} gagal (exit ${res.status}): ${(res.stderr ?? '').trim()}`);
+		}
+		return (res.stdout ?? '').trim();
 	}
 
 	public getProjectName(): string {
@@ -118,10 +155,7 @@ export class DisposableStack {
 	}
 
 	private getPublishedPort(service: string, containerPort: number): number {
-		const stdout = execSync(
-			`docker compose -p "${this.projectName}" -f "${this.composeFile}" port ${service} ${containerPort}`,
-			{ env: this.env, encoding: 'utf-8' }
-		).trim();
+		const stdout = this.compose(['port', service, String(containerPort)]);
 
 		// Format output: 0.0.0.0:12345 atau [::]:12345 atau 127.0.0.1:12345
 		const match = stdout.match(/:(\d+)$/);
@@ -134,12 +168,15 @@ export class DisposableStack {
 	public async start(): Promise<IDisposableStackEndpoints> {
 		this.registerProcessHooks();
 
-		// Start compose stack dengan project name terisolasi
-		execSync(
-			`docker compose -p "${this.projectName}" -f "${this.composeFile}" up -d --wait`,
-			{ env: this.env, stdio: ['pipe', 'pipe', 'pipe'] }
-		);
+		// Mark started before `up`: a failed/timed-out `up --wait` can still leave half-created containers
+		// and networks behind, and stop()/the exit hook only clean up a started stack.
 		this.isStarted = true;
+		try {
+			this.compose(['up', '-d', '--wait']);
+		} catch (err) {
+			this.stopSync();
+			throw err;
+		}
 
 		const pgPort = this.getPublishedPort('postgres', 5432);
 		const minioPort = this.getPublishedPort('minio', 9000);
@@ -225,11 +262,10 @@ export class DisposableStack {
 
 	public stopSync(): void {
 		try {
-			spawnSync(
-				'docker',
-				['compose', '-p', this.projectName, '-f', this.composeFile, 'down', '-v', '--remove-orphans'],
-				{ stdio: 'ignore' }
-			);
+			spawnSync('docker', ['compose', '-p', this.projectName, '-f', this.composeFile, 'down', '-v', '--remove-orphans'], {
+				env: this.env,
+				stdio: 'ignore'
+			});
 		} finally {
 			this.isStarted = false;
 			this.endpoints = null;
@@ -239,10 +275,7 @@ export class DisposableStack {
 	public async stop(): Promise<void> {
 		if (!this.isStarted) return;
 		try {
-			execSync(
-				`docker compose -p "${this.projectName}" -f "${this.composeFile}" down -v --remove-orphans`,
-				{ stdio: 'pipe' }
-			);
+			this.compose(['down', '-v', '--remove-orphans']);
 		} finally {
 			this.isStarted = false;
 			this.endpoints = null;

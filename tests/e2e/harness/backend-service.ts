@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import http from 'http';
 import path from 'path';
 import { IDisposableStackEndpoints } from './disposable-stack';
@@ -41,16 +41,15 @@ export const startBackendService = async (
 		PROJECT_ADMIN_LEVELS: 'ADMIN,QA,SUPERADMIN'
 	};
 
-	const child: ChildProcess = spawn(
-		'pnpm',
-		['exec', 'tsx', 'src/index.ts'],
-		{
-			cwd: projectRoot,
-			env,
-			stdio: ['ignore', 'pipe', 'pipe'],
-			shell: true
-		}
-	);
+	// Run node itself with the tsx loader: one process, no pnpm/shell wrapper whose kill() would leave the
+	// real server orphaned (holding its port and DB/MinIO connections) — notably on Windows.
+	const child: ChildProcess = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
+		cwd: projectRoot,
+		env,
+		stdio: ['ignore', 'pipe', 'pipe'],
+		// Own process group on POSIX so the whole tree can be signalled.
+		detached: process.platform !== 'win32'
+	});
 
 	let serverOutput = '';
 	child.stdout?.on('data', (d) => {
@@ -79,7 +78,7 @@ export const startBackendService = async (
 	}
 
 	if (!ready) {
-		child.kill();
+		await stopProcessTree(child);
 		throw new Error(`Backend gagal start dalam 30s. Output server:\n${serverOutput}`);
 	}
 
@@ -88,12 +87,34 @@ export const startBackendService = async (
 	return {
 		port,
 		baseUrl,
-		stop: async () => {
-			if (child.pid) {
-				child.kill();
+		stop: () => stopProcessTree(child)
+	};
+};
+
+/** Kill the child and everything it spawned, then wait for it to exit (force-kill after a grace period). */
+export const stopProcessTree = async (child: ChildProcess, graceMs = 5000): Promise<void> => {
+	if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
+	const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+
+	const killTree = (force: boolean) => {
+		try {
+			if (process.platform === 'win32') {
+				spawnSync('taskkill', ['/pid', String(child.pid), '/T', ...(force ? ['/F'] : [])], { stdio: 'ignore' });
+			} else {
+				process.kill(-child.pid!, force ? 'SIGKILL' : 'SIGTERM');
 			}
+		} catch {
+			// Already gone.
 		}
 	};
+
+	// Windows can't deliver a graceful signal to a console-less node process, so force from the start.
+	killTree(process.platform === 'win32');
+	const timer = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), graceMs).unref());
+	if ((await Promise.race([exited, timer])) === 'timeout') {
+		killTree(true);
+		await exited;
+	}
 };
 
 const getRandomPort = (): Promise<number> => {

@@ -11,6 +11,7 @@ async function runE2E() {
 	const jestPath = path.resolve(projectRoot, 'node_modules/.bin', jestCmd);
 
 	const args = [
+		'tests/e2e/harness/__tests__/backend-service.spec.ts',
 		'tests/e2e/harness/__tests__/disposable-stack.spec.ts',
 		'tests/e2e/harness/__tests__/migration-and-fixtures.spec.ts',
 		'tests/e2e/harness/__tests__/extension-golden-path.spec.ts',
@@ -27,15 +28,21 @@ async function runE2E() {
 		shell: true
 	});
 
-	child.on('exit', (code) => {
+	child.on('error', (err) => {
+		console.error(`❌ Gagal menjalankan jest: ${err.message}`);
+		process.exit(1);
+	});
+
+	child.on('exit', (code, signal) => {
 		console.info('=====================================================');
 		if (code === 0) {
 			console.info('✅ SELURUH POSTGRESQL RECORDER E2E TEST BERHASIL LULUS!');
 		} else {
-			console.error(`❌ POSTGRESQL RECORDER E2E TEST GAGAL (exit code: ${code})`);
+			console.error(`❌ POSTGRESQL RECORDER E2E TEST GAGAL (${signal ? `signal: ${signal}` : `exit code: ${code}`})`);
 		}
 		console.info('=====================================================');
-		process.exit(code || 0);
+		// A signal-killed jest reports code === null; that must fail the run, not exit 0.
+		process.exit(code ?? 1);
 	});
 }
 
