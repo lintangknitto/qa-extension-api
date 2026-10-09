@@ -8,6 +8,7 @@ import * as sessionRepo from '../repo/session.repo';
 
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB
 
+const VIDEO_FILE_NAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webm$/;
 const videoKeyPrefix = (idSession: number) => `sessions/${idSession}/video/`;
 /** UUID, bukan session+timestamp: bucket bisa ditulis publik, key yang bisa ditebak memudahkan penimpaan. */
 export const buildVideoObjectKey = (idSession: number): string => `${videoKeyPrefix(idSession)}${randomUUID()}.webm`;
@@ -75,14 +76,19 @@ export const completeSessionVideoUseCase = async (ctx: {
 
 	const objectKey = ctx.input.object_key;
 	const prefix = videoKeyPrefix(ctx.idSession);
-	if (!objectKey?.startsWith(prefix) || !/^[0-9a-f-]{36}\.webm$/.test(objectKey.slice(prefix.length))) {
+	if (!objectKey?.startsWith(prefix) || !VIDEO_FILE_NAME.test(objectKey.slice(prefix.length))) {
 		throw new InvalidParameterException('Object key tidak valid untuk sesi ini.');
 	}
 
+	let size: number;
 	try {
-		await statArtifactObject(objectKey);
+		({ size } = await statArtifactObject(objectKey));
 	} catch {
 		throw new InvalidParameterException('File video belum berhasil terunggah ke storage MinIO.');
+	}
+	// Bucket bisa ditulis publik: ukuran dicek dari objek yang benar-benar terunggah, bukan nilai saat presign.
+	if (size > MAX_VIDEO_BYTES) {
+		throw new InvalidParameterException('Ukuran video melebihi batas 100MB.');
 	}
 
 	await sessionRepo.updateSessionVideoObjectKey(ctx.idSession, objectKey);

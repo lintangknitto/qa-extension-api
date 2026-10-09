@@ -106,7 +106,7 @@ describe('Session Video Use Cases (MinIO)', () => {
 
 		it('menolak format key lama (session+timestamp) dan path traversal', async () => {
 			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue(mockSession);
-			for (const object_key of ['sessions/10/1-video-123.webm', 'sessions/1/video/../../x.webm', 'sessions/1/video/abc.webm']) {
+			for (const object_key of ['sessions/10/1-video-123.webm', 'sessions/1/video/../../x.webm', 'sessions/1/video/abc.webm', 'sessions/1/video/------------------------------------.webm']) {
 				await expect(
 					completeSessionVideoUseCase({ idSession: 1, userId: 5, userLevel: 'QA', input: { object_key } })
 				).rejects.toThrow('Object key tidak valid untuk sesi ini.');
@@ -126,6 +126,16 @@ describe('Session Video Use Cases (MinIO)', () => {
 					input: { object_key: VALID_KEY }
 				})
 			).rejects.toThrow(InvalidParameterException);
+		});
+
+		it('menolak video terunggah yang melebihi 100MB dan tidak menyimpan key', async () => {
+			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue(mockSession);
+			(minioClient.statArtifactObject as jest.Mock).mockResolvedValue({ size: 100 * 1024 * 1024 + 1 });
+
+			await expect(
+				completeSessionVideoUseCase({ idSession: 1, userId: 5, userLevel: 'QA', input: { object_key: VALID_KEY } })
+			).rejects.toThrow('Ukuran video melebihi batas 100MB.');
+			expect(sessionRepo.updateSessionVideoObjectKey).not.toHaveBeenCalled();
 		});
 
 		it('memverifikasi objek di MinIO, menyimpan object key, dan mengembalikan URL publik', async () => {
