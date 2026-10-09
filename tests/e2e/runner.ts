@@ -17,6 +17,7 @@ async function runE2E() {
 		'tests/e2e/harness/__tests__/extension-golden-path.spec.ts',
 		'tests/e2e/harness/__tests__/codegen-and-investigation.spec.ts',
 		'tests/e2e/harness/__tests__/test-case-format-v4.spec.ts',
+		'tests/e2e/harness/__tests__/minio-public-read.spec.ts',
 		// jest.config ignores tests/e2e so `pnpm test` stays a fast unit run; lift that here.
 		'--testPathIgnorePatterns=/node_modules/',
 		'--runInBand',
