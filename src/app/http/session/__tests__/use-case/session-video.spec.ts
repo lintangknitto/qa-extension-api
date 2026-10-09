@@ -13,6 +13,7 @@ import * as sessionQueries from '../../queries/session.queries';
 import * as sessionRepo from '../../repo/session.repo';
 import * as runRepo from '../../repo/session-run.repo';
 import * as minioClient from '@/libs/config/minioClient';
+import { buildVideoFileName } from '@/libs/helpers/videoFileName';
 
 jest.mock('../../queries/session.queries');
 jest.mock('../../repo/session.repo');
@@ -220,6 +221,17 @@ describe('Session Video Use Cases (MinIO)', () => {
 			[null, false]
 		])('%s → %s', (key, expected) => {
 			expect(isValidVideoObjectKey(1, key)).toBe(expected);
+		});
+
+		it('nama dari buildVideoFileName untuk TC sangat panjang dan judul emoji tetap valid', () => {
+			for (const input of [
+				{ testCaseNo: 'TC ' + 'a'.repeat(200) + ' x', title: 'Judul' },
+				{ testCaseNo: 'TC-1', title: '\u{1F600}'.repeat(200) },
+				{ testCaseNo: 'TC-2', title: 'a\uD83Db' }
+			]) {
+				const name = buildVideoFileName({ ...input, startedAt: '2026-10-09T00:00:00Z', runNumber: 1 });
+				expect(isValidVideoObjectKey(1, `sessions/1/video/${uuid}/${name}`)).toBe(true);
+			}
 		});
 	});
 });
