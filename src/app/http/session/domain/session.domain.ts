@@ -5,6 +5,7 @@ import {
 } from '@knittotextile/knitto-core-backend/dist/CoreException';
 import { buildPublicObjectUrl } from '@/libs/config/minioClient';
 import { canManageProjects } from '@/libs/helpers/access';
+import { buildVideoFileName } from '@/libs/helpers/videoFileName';
 
 export const SESSION_STATUS = {
 	RECORDING: 'recording',
@@ -21,6 +22,18 @@ export const assertValidSessionResult = (result: string): TSessionResult => {
 	if (!SESSION_RESULTS.includes(result as TSessionResult))
 		throw new InvalidParameterException('Hasil session harus salah satu dari PASS, FAIL, atau BLOCKED.');
 	return result as TSessionResult;
+};
+
+/** Pemetaan hasil sesi/run ke status test case (dipakai end-session dan re-run). */
+export const testCaseStatusForResult = (result: TSessionResult): string => {
+	if (result === 'FAIL') return 'Failed';
+	if (result === 'BLOCKED') return 'Re-Test';
+	return 'Passed';
+};
+
+export const assertSessionIsCompleted = (session: Entity.IQaRecordingSession): void => {
+	if (session.status === SESSION_STATUS.RECORDING)
+		throw new InvalidParameterException('Session masih merekam. Akhiri session sebelum menyimpan re-run.');
 };
 
 export const assertSessionIsRecording = (session: Entity.IQaRecordingSession): void => {
@@ -85,4 +98,40 @@ export const toCheckpointResponse = (checkpoint: Entity.IQaRecordingCheckpoint) 
 	id_artifact: checkpoint.id_artifact !== undefined && checkpoint.id_artifact !== null ? Number(checkpoint.id_artifact) : null,
 	created_by_user_id: checkpoint.created_by_user_id !== undefined && checkpoint.created_by_user_id !== null ? Number(checkpoint.created_by_user_id) : null,
 	created_at: checkpoint.created_at ?? null
+});
+
+const NAMED_VIDEO_KEY = /\/video\/[0-9a-f-]{36}\/([^/]+\.webm)$/;
+
+/** Nama file dari key bernama (`video/<uuid>/<nama>`); key lama dihitung dari data sesi/run. */
+export const videoFileNameForRun = (
+	session: Entity.IQaRecordingSession,
+	run: Entity.IQaRecordingSessionRun
+): string => {
+	const match = run.video_object_key?.match(NAMED_VIDEO_KEY);
+	if (match) return match[1];
+	return buildVideoFileName({
+		testCaseNo: session.test_case_no,
+		title: session.title,
+		startedAt: run.started_at ?? session.started_at ?? session.created_at ?? new Date(),
+		runNumber: Number(run.run_number ?? 1)
+	});
+};
+
+const numberOrNull = (value: unknown): number | null => (value === undefined || value === null ? null : Number(value));
+
+export const toRunResponse = (session: Entity.IQaRecordingSession, run: Entity.IQaRecordingSessionRun) => ({
+	id_run: numberOrNull(run.id_run),
+	id_session: numberOrNull(run.id_session),
+	run_number: Number(run.run_number ?? 1),
+	kind: run.kind ?? 'rerun',
+	result: run.result ?? null,
+	actual_result: run.actual_result ?? null,
+	executed_steps: numberOrNull(run.executed_steps),
+	error: run.error ?? null,
+	video_url: run.video_object_key ? buildPublicObjectUrl(run.video_object_key) : null,
+	video_file_name: videoFileNameForRun(session, run),
+	started_at: run.started_at ?? null,
+	ended_at: run.ended_at ?? null,
+	created_by_user_id: numberOrNull(run.created_by_user_id),
+	created_at: run.created_at ?? null
 });

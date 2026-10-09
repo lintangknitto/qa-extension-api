@@ -30,4 +30,17 @@ router.get(
 	requestHandler(controller.downloadUrl)
 );
 
+router.get(
+	['/sessions/:id_session/test-data-files', '/api/v1/sessions/:id_session/test-data-files'],
+	requestValidator({ requestType: 'params', type: request.sessionParamValidation }),
+	requestHandler(controller.listTestDataFiles)
+);
+
+router.put(
+	['/sessions/:id_session/test-data-files', '/api/v1/sessions/:id_session/test-data-files'],
+	requestValidator({ requestType: 'params', type: request.sessionParamValidation }),
+	requestValidator({ requestType: 'body', type: request.linkTestDataFilesValidation }),
+	requestHandler(controller.linkTestDataFiles)
+);
+
 export default router;

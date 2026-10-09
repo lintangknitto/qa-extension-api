@@ -6,14 +6,17 @@ import {
 import {
 	presignSessionVideoUseCase,
 	completeSessionVideoUseCase,
-	getSessionVideoUrlUseCase
+	getSessionVideoUrlUseCase,
+	isValidVideoObjectKey
 } from '../../use-case/session-video.use-case';
 import * as sessionQueries from '../../queries/session.queries';
 import * as sessionRepo from '../../repo/session.repo';
+import * as runRepo from '../../repo/session-run.repo';
 import * as minioClient from '@/libs/config/minioClient';
 
 jest.mock('../../queries/session.queries');
 jest.mock('../../repo/session.repo');
+jest.mock('../../repo/session-run.repo');
 jest.mock('@/libs/config/minioClient');
 
 describe('Session Video Use Cases (MinIO)', () => {
@@ -58,7 +61,7 @@ describe('Session Video Use Cases (MinIO)', () => {
 				input: { size_bytes: 5 * 1024 * 1024, content_type: 'video/webm' }
 			});
 
-			expect(result.object_key).toMatch(/^sessions\/1\/video\/[0-9a-f-]{36}\.webm$/);
+			expect(result.object_key).toMatch(/^sessions\/1\/video\/[0-9a-f-]{36}\/TC-AUTH-01 - Login User Valid - .+ - Run 1\.webm$/);
 			expect(result.upload_url).toBe(`http://minio.pub/bucket/${result.object_key}`);
 			expect(result.content_type).toBe('video/webm');
 		});
@@ -153,6 +156,7 @@ describe('Session Video Use Cases (MinIO)', () => {
 			expect(minioClient.statArtifactObject).toHaveBeenCalledWith(VALID_KEY);
 			expect(result.video_url).toBe(`http://minio.pub/bucket/${VALID_KEY}`);
 			expect(sessionRepo.updateSessionVideoObjectKey).toHaveBeenCalledWith(1, VALID_KEY);
+			expect(runRepo.updateOriginalRunVideoObjectKey).toHaveBeenCalledWith(1, VALID_KEY);
 		});
 	});
 
@@ -198,6 +202,24 @@ describe('Session Video Use Cases (MinIO)', () => {
 					userLevel: 'QA'
 				})
 			).rejects.toThrow(NotFoundException);
+		});
+	});
+
+	describe('isValidVideoObjectKey', () => {
+		const uuid = '0f8fad5b-d9cb-469f-a165-70867728950e';
+		it.each([
+			[`sessions/1/video/${uuid}.webm`, true],
+			[`sessions/1/video/${uuid}/TC-1 - Login - 2026-10-09 10.05 - Run 1.webm`, true],
+			[`sessions/2/video/${uuid}/a.webm`, false],
+			[`sessions/1/video/${uuid}/../x.webm`, false],
+			[`sessions/1/video/${uuid}/a/b.webm`, false],
+			[`sessions/1/video/${uuid}/..webm`, false],
+			[`sessions/1/video/${uuid}/a:b.webm`, false],
+			[`sessions/1/video/${uuid}/a.mp4`, false],
+			[`sessions/1/video/not-a-uuid/a.webm`, false],
+			[null, false]
+		])('%s → %s', (key, expected) => {
+			expect(isValidVideoObjectKey(1, key)).toBe(expected);
 		});
 	});
 });

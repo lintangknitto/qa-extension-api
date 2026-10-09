@@ -12,7 +12,8 @@ import { launchBrowserHarness, IBrowserHarness } from '../browser-harness';
  */
 
 const projectRoot = path.resolve(__dirname, '../../../../');
-const UUID_WEBM = /^sessions\/\d+\/video\/[0-9a-f-]{36}\.webm$/;
+/** Key video bernama (multi-tab-video-and-run-history): `video/<uuid>/<nama file>.webm`. */
+const UUID_WEBM = /^sessions\/\d+\/video\/[0-9a-f-]{36}\/[^/]+ - Run 1\.webm$/;
 
 describe('MinIO bucket publik tanpa signature (test-matrix PB-1..PB-4)', () => {
 	jest.setTimeout(300000);
@@ -165,7 +166,7 @@ describe('MinIO bucket publik tanpa signature (test-matrix PB-1..PB-4)', () => {
 		const { upload_url, object_key } = presign.result;
 		expect(object_key).toMatch(UUID_WEBM);
 		expect(object_key.startsWith(`sessions/${sessionId}/video/`)).toBe(true);
-		expect(upload_url).toBe(`${minioBase}/${object_key}`);
+		expect(upload_url).toBe(`${minioBase}/${object_key.split('/').map(encodeURIComponent).join('/')}`);
 		expect(upload_url).not.toMatch(/X-Amz-/);
 
 		const put = await fetch(upload_url, { method: 'PUT', body: webm, headers: { 'Content-Type': 'video/webm' } });
@@ -292,7 +293,7 @@ describe('MinIO bucket publik tanpa signature (test-matrix PB-1..PB-4)', () => {
 			const res = await api('GET', `/sessions/${sessionId}`, undefined, alt.baseUrl);
 			expect(res.status).toBe(200);
 			const key = (await pool.query('SELECT video_object_key FROM recording_sessions WHERE id_session = $1', [sessionId])).rows[0].video_object_key;
-			expect(res.result.video_url).toBe(`http://localhost:${endpoints.minio.port}/${endpoints.minio.bucket}/${key}`);
+			expect(res.result.video_url).toBe(`http://localhost:${endpoints.minio.port}/${endpoints.minio.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`);
 			expect((await fetch(res.result.video_url)).status).toBe(200);
 		} finally {
 			await alt.stop();

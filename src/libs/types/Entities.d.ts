@@ -120,6 +120,23 @@ declare namespace Entity {
 		updated_at?: string
 	}
 
+	interface IQaRecordingSessionRun {
+		id_run?: number
+		id_session?: number
+		run_number?: number
+		/** `original` (Run #1, rekaman asli) | `rerun` */
+		kind?: string
+		result?: string | null
+		actual_result?: string | null
+		executed_steps?: number | null
+		error?: string | null
+		video_object_key?: string | null
+		started_at?: string | null
+		ended_at?: string | null
+		created_by_user_id?: number | null
+		created_at?: string
+	}
+
 	interface IQaRecordingEvent {
 		id_event?: number
 		id_session?: number
@@ -141,6 +158,8 @@ declare namespace Entity {
 		size_bytes?: number
 		sequence?: number | null
 		checksum_sha256?: string | null
+		/** Nama file asli (test data upload). */
+		file_name?: string | null
 		status?: string
 		created_at?: string
 		updated_at?: string

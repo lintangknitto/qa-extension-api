@@ -9,6 +9,10 @@ jest.mock('@/app/http/recording/queries/recording-event.queries', () => ({
 	listFailureSignalEventsBySession: jest.fn().mockResolvedValue([])
 }));
 
+jest.mock('@/app/http/recording/queries/artifact.queries', () => ({
+	listArtifactsBySession: jest.fn().mockResolvedValue([])
+}));
+
 jest.mock('@/app/http/recording/queries/generation.queries', () => ({
 	listGenerations: jest.fn()
 }));

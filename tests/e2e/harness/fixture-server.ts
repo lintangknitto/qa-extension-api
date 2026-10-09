@@ -6,6 +6,8 @@ export interface IFixtureServer {
 	baseUrl: string;
 	/** requestId respons 5xx terakhir dari `POST /api/order`. */
 	lastOrderRequestId: () => string | null;
+	/** Upload terakhir dari halaman `/upload` (nama file + isi base64). */
+	lastUpload: () => { name: string; type: string; data: string } | null;
 	stop: () => Promise<void>;
 }
 
@@ -89,6 +91,35 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 </body>
 </html>`;
 
+	// Halaman satu warna penuh: video multi-tab diverifikasi dengan sampling warna frame (merah = tab A, biru = tab B).
+	const colorHtml = (color: string) => `<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"><title>Tab ${color}</title>
+<style>html,body{margin:0;height:100%;background:${color}}a{display:block;padding:24px;color:#fff;font:600 20px sans-serif}</style></head>
+<body><a id="open-blue" href="/color/blue" target="_blank">Buka tab biru</a></body></html>`;
+
+	// Upload file: isi file dikirim ke server agar E2E bisa memverifikasi nama + isi yang dipasang re-run.
+	const uploadHtml = `<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"><title>Upload Fixture</title></head>
+<body>
+  <label for="lampiran">Lampiran</label>
+  <input id="lampiran" type="file" />
+  <p id="upload-status" role="status"></p>
+  <script>
+    document.getElementById('lampiran').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const data = String(reader.result).split(',')[1] || '';
+        await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, type: file.type, data }) });
+        document.getElementById('upload-status').textContent = 'Terunggah: ' + file.name;
+      };
+      reader.readAsDataURL(file);
+    });
+  </script>
+</body></html>`;
+
+	let lastUpload: { name: string; type: string; data: string } | null = null;
 	let orderRequestCount = 0;
 	let lastOrderRequestId: string | null = null;
 	let port = 0;
@@ -97,6 +128,30 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 		if (req.url === '/health') {
 			res.writeHead(200, { 'Content-Type': 'application/json' });
 			res.end(JSON.stringify({ status: 'ok', service: 'fixture-server' }));
+			return;
+		}
+
+		const colorMatch = req.url?.match(/^\/color\/(red|blue)$/);
+		if (colorMatch) {
+			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+			res.end(colorHtml(colorMatch[1] === 'red' ? '#ff0000' : '#0000ff'));
+			return;
+		}
+
+		if (req.url === '/upload') {
+			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+			res.end(uploadHtml);
+			return;
+		}
+
+		if (req.url === '/api/upload' && req.method === 'POST') {
+			let body = '';
+			req.on('data', (chunk) => (body += chunk));
+			req.on('end', () => {
+				lastUpload = JSON.parse(body);
+				res.writeHead(200, { 'Content-Type': 'application/json' });
+				res.end('{"ok":true}');
+			});
 			return;
 		}
 
@@ -135,6 +190,7 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 		port,
 		baseUrl,
 		lastOrderRequestId: () => lastOrderRequestId,
+		lastUpload: () => lastUpload,
 		stop: () =>
 			new Promise<void>((resolve, reject) => {
 				server.close((err) => (err ? reject(err) : resolve()));

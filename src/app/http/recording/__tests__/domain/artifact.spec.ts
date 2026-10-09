@@ -3,6 +3,8 @@ import {
 	NotFoundException
 } from '@knittotextile/knitto-core-backend/dist/CoreException';
 import {
+	allowedContentTypesForKind,
+	TEST_DATA_CONTENT_TYPES,
 	assertAllowedContentType,
 	assertArtifactBelongsToSession,
 	assertArtifactExists,
@@ -37,6 +39,37 @@ describe('artifact.domain', () => {
 		it('menolak content type di luar allowlist', () => {
 			expect(isAllowedContentType('text/html', ALLOWLIST)).toBe(false);
 			expect(() => assertAllowedContentType('text/html', ALLOWLIST)).toThrow(InvalidParameterException);
+		});
+	});
+
+	describe('test_data_file', () => {
+		it('kind test_data_file dikenal', () => {
+			expect(assertSupportedArtifactKind('test_data_file')).toBe('test_data_file');
+		});
+
+		it('memakai allowlist test data (wildcard image/* dan Office) terlepas dari konfigurasi env', () => {
+			const allowed = allowedContentTypesForKind('test_data_file', ALLOWLIST);
+			expect(allowed).toBe(TEST_DATA_CONTENT_TYPES);
+			for (const type of [
+				'application/pdf',
+				'image/heic',
+				'text/csv',
+				'application/zip',
+				'application/octet-stream',
+				'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+				'application/msword'
+			])
+				expect(isAllowedContentType(type, allowed)).toBe(true);
+			expect(isAllowedContentType('text/html', allowed)).toBe(false);
+			expect(isAllowedContentType('', allowed)).toBe(false);
+			expect(allowedContentTypesForKind('screenshot', ALLOWLIST)).toBe(ALLOWLIST);
+		});
+
+		it('ekstensi object key test data mengikuti content type', () => {
+			expect(extensionForContentType('application/pdf')).toBe('pdf');
+			expect(extensionForContentType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBe('xlsx');
+			expect(buildArtifactObjectKey({ idSession: 3, kind: 'test_data_file', contentType: 'text/csv' }))
+				.toMatch(/^sessions\/3\/test_data_file\/[0-9a-f-]{36}\.csv$/);
 		});
 	});
 

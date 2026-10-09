@@ -7,8 +7,16 @@ import type {
 	TSessionIdParamValidation,
 	TShareTokenParamValidation,
 	TPresignVideoUploadValidation,
-	TCompleteVideoUploadValidation
+	TCompleteVideoUploadValidation,
+	TCreateRunValidation,
+	TRunNumberParamValidation
 } from './session.request';
+import {
+	createRunUseCase,
+	listRunsUseCase,
+	presignRunVideoUseCase,
+	completeRunVideoUseCase
+} from './use-case/session-run.use-case';
 import { createSessionUseCase } from './use-case/create-session.use-case';
 import { listSessionsUseCase } from './use-case/list-session.use-case';
 import { detailSessionUseCase } from './use-case/detail-session.use-case';
@@ -164,7 +172,52 @@ const discardActive: TRequestFunction = async (req) => {
 	return { result: { success: true, count } };
 };
 
+const createRun: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	const result = await createRunUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input: req.body as TCreateRunValidation
+	});
+	return { result, statusCode: 201 };
+};
+
+const listRuns: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionIdParamValidation;
+	const result = await listRunsUseCase({ idSession: params.id_session, userId: req.userId, userLevel: req.userData?.level });
+	return { result };
+};
+
+const presignRunVideo: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TRunNumberParamValidation;
+	const result = await presignRunVideoUseCase({
+		idSession: params.id_session,
+		runNumber: params.run_number,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input: req.body as TPresignVideoUploadValidation
+	});
+	return { result, statusCode: 201 };
+};
+
+const completeRunVideo: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TRunNumberParamValidation;
+	const result = await completeRunVideoUseCase({
+		idSession: params.id_session,
+		runNumber: params.run_number,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input: req.body as TCompleteVideoUploadValidation
+	});
+	return { result };
+};
+
 export default {
+	createRun,
+	listRuns,
+	presignRunVideo,
+	completeRunVideo,
 	create,
 	list,
 	detail,

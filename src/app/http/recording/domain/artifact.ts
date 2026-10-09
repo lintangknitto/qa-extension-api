@@ -4,7 +4,7 @@ import {
 	NotFoundException
 } from '@knittotextile/knitto-core-backend/dist/CoreException';
 
-export const ARTIFACT_KINDS = ['screenshot', 'network_body', 'console', 'dom', 'video', 'storage_state', 'other'] as const;
+export const ARTIFACT_KINDS = ['screenshot', 'network_body', 'console', 'dom', 'video', 'storage_state', 'test_data_file', 'other'] as const;
 export type TArtifactKind = (typeof ARTIFACT_KINDS)[number];
 
 export const ARTIFACT_STATUS = {
@@ -18,8 +18,42 @@ const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
 	'image/webp': 'webp',
 	'application/json': 'json',
 	'text/plain': 'txt',
-	'video/webm': 'webm'
+	'video/webm': 'webm',
+	'application/pdf': 'pdf',
+	'image/gif': 'gif',
+	'text/csv': 'csv',
+	'application/zip': 'zip',
+	'application/x-zip-compressed': 'zip',
+	'application/msword': 'doc',
+	'application/vnd.ms-excel': 'xls',
+	'application/vnd.ms-powerpoint': 'ppt',
+	'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+	'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx'
 };
+
+/**
+ * File yang dipilih tester saat merekam langkah upload, dipakai ulang saat re-run.
+ * Allowlist sendiri (bukan `RECORDING_ARTIFACT_CONTENT_TYPES`) agar `.env` lama tidak memblokir test data.
+ * Pola `tipe/*` atau berakhiran `.*` cocok sebagai prefix.
+ */
+export const TEST_DATA_CONTENT_TYPES = [
+	'application/pdf',
+	'image/*',
+	'text/csv',
+	'text/plain',
+	'application/json',
+	'application/zip',
+	'application/x-zip-compressed',
+	'application/msword',
+	'application/vnd.ms-excel',
+	'application/vnd.ms-powerpoint',
+	'application/vnd.openxmlformats-officedocument.*',
+	'application/octet-stream'
+] as const;
+
+export const allowedContentTypesForKind = (kind: string, configured: readonly string[]): readonly string[] =>
+	kind === 'test_data_file' ? TEST_DATA_CONTENT_TYPES : configured;
 
 export const isSupportedArtifactKind = (kind: string): kind is TArtifactKind =>
 	(ARTIFACT_KINDS as readonly string[]).includes(kind);
@@ -35,7 +69,12 @@ export const baseContentType = (contentType: string): string =>
 
 export const isAllowedContentType = (contentType: string, allowlist: readonly string[]): boolean => {
 	const base = baseContentType(contentType);
-	return allowlist.map((item) => baseContentType(item)).includes(base);
+	if (!base) return false;
+	return allowlist.some((item) => {
+		const allowed = baseContentType(item);
+		if (allowed.endsWith('/*') || allowed.endsWith('.*')) return base.startsWith(allowed.slice(0, -1));
+		return allowed === base;
+	});
 };
 
 export const assertAllowedContentType = (contentType: string, allowlist: readonly string[]): void => {
@@ -107,6 +146,7 @@ export const toArtifactResponse = (artifact: Entity.IQaRecordingArtifact) => ({
 	size_bytes: Number(artifact.size_bytes ?? 0),
 	sequence: artifact.sequence !== undefined && artifact.sequence !== null ? Number(artifact.sequence) : null,
 	checksum_sha256: artifact.checksum_sha256 ?? null,
+	file_name: artifact.file_name ?? null,
 	status: artifact.status ?? null,
 	created_at: artifact.created_at ?? null
 });

@@ -1,6 +1,7 @@
 import { TRequestFunction } from '@knittotextile/knitto-http';
 import type {
 	TCompleteArtifactUploadValidation,
+	TLinkTestDataFilesValidation,
 	TPresignArtifactUploadValidation,
 	TSessionArtifactParamValidation,
 	TSessionParamValidation
@@ -9,6 +10,7 @@ import { presignArtifactUploadUseCase } from './use-case/presign-artifact-upload
 import { completeArtifactUploadUseCase } from './use-case/complete-artifact-upload.use-case';
 import { getArtifactDownloadUrlUseCase } from './use-case/get-artifact-download-url.use-case';
 import { listArtifactsUseCase } from './use-case/list-artifacts.use-case';
+import { linkTestDataFilesUseCase, listTestDataFilesUseCase } from './use-case/test-data-files.use-case';
 
 const list: TRequestFunction = async (req) => {
 	const params = req.params as unknown as TSessionParamValidation;
@@ -56,7 +58,26 @@ const downloadUrl: TRequestFunction = async (req) => {
 	return { result };
 };
 
+const listTestDataFiles: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionParamValidation;
+	const result = await listTestDataFilesUseCase({ idSession: params.id_session, userId: req.userId, userLevel: req.userData?.level });
+	return { result };
+};
+
+const linkTestDataFiles: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TSessionParamValidation;
+	const result = await linkTestDataFilesUseCase({
+		idSession: params.id_session,
+		userId: req.userId,
+		userLevel: req.userData?.level,
+		input: req.body as TLinkTestDataFilesValidation
+	});
+	return { result };
+};
+
 export default {
+	listTestDataFiles,
+	linkTestDataFiles,
 	list,
 	presignUpload,
 	completeUpload,

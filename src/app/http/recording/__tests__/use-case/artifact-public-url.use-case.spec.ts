@@ -37,6 +37,19 @@ describe('URL artifact publik (bucket MinIO tanpa signature)', () => {
 		expect(result.artifact).toMatchObject({ id_artifact: 7 });
 	});
 
+	it('test_data_file boleh di-presign setelah sesi selesai (file pengganti re-run); kind lain tidak', async () => {
+		(sessionQueries.findSessionById as jest.Mock).mockResolvedValue({ ...session, status: 'completed' });
+		(artifactRepo.insertArtifact as jest.Mock).mockResolvedValue(8);
+		(artifactQueries.findArtifactById as jest.Mock).mockResolvedValue({ id_artifact: 8, id_session: 1, status: 'pending' });
+		const presign = (kind: string, content_type: string) =>
+			presignArtifactUploadUseCase({ idSession: 1, userId: 5, userLevel: 'QA', input: { kind, content_type, size_bytes: 10 } });
+
+		const result = await presign('test_data_file', 'application/pdf');
+		expect(result.object_key).toMatch(/^sessions\/1\/test_data_file\/[0-9a-f-]{36}\.pdf$/);
+		await expect(presign('screenshot', 'image/png')).rejects.toThrow(InvalidParameterException);
+		await expect(presign('test_data_file', 'text/html')).rejects.toThrow(InvalidParameterException);
+	});
+
 	it('download URL adalah URL publik dari object key artifact', async () => {
 		(artifactQueries.findArtifactById as jest.Mock).mockResolvedValue({
 			id_artifact: 7,

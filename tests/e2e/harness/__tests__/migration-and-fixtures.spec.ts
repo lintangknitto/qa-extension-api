@@ -39,6 +39,7 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 		expect(firstRunOutput).toContain('Applying 001_init_schema.sql');
 		expect(firstRunOutput).toContain('Applying 002_test_case_templates_v4.sql');
 		expect(firstRunOutput).toContain('Applying 003_recording_session_video_object_key.sql');
+		expect(firstRunOutput).toContain('Applying 004_recording_session_runs.sql');
 		expect(firstRunOutput).toContain('Database migrations are up to date.');
 
 		const pool = new Pool({
@@ -57,7 +58,8 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			expect(migRows.rows.map((r) => r.version)).toEqual([
 				'001_init_schema.sql',
 				'002_test_case_templates_v4.sql',
-				'003_recording_session_video_object_key.sql'
+				'003_recording_session_video_object_key.sql',
+				'004_recording_session_runs.sql'
 			]);
 
 			const videoKeyColumn = await pool.query(
@@ -96,16 +98,18 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			expect(tableNames).toContain('recording_events');
 			expect(tableNames).toContain('recording_artifacts');
 			expect(tableNames).toContain('recording_generations');
+			expect(tableNames).toContain('recording_session_runs');
 
-			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 3, seed V4 tidak dobel)
+			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 4, seed V4 tidak dobel)
 			const secondRunOutput = execSync(`pnpm exec tsx "${migrateScriptPath}"`, { env, encoding: 'utf-8' });
 			expect(secondRunOutput).not.toContain('Applying 001_init_schema.sql');
 			expect(secondRunOutput).not.toContain('Applying 002_test_case_templates_v4.sql');
 			expect(secondRunOutput).not.toContain('Applying 003_recording_session_video_object_key.sql');
+			expect(secondRunOutput).not.toContain('Applying 004_recording_session_runs.sql');
 			expect(secondRunOutput).toContain('Database migrations are up to date.');
 
 			const migRowsAfter = await pool.query('SELECT COUNT(*) AS total FROM schema_migrations');
-			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(3);
+			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(4);
 			const templateCountAfter = await pool.query('SELECT COUNT(*) AS total FROM test_case_templates');
 			expect(parseInt(templateCountAfter.rows[0].total, 10)).toBe(1);
 		} finally {

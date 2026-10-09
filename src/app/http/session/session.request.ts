@@ -141,7 +141,36 @@ const completeVideoUploadValidation = object({
 });
 export type TCompleteVideoUploadValidation = InferOutput<typeof completeVideoUploadValidation>;
 
+const runNumberParamValidation = object({
+	id_session: sessionIdParamValidation.entries.id_session,
+	run_number: pipe(
+		string(ERROR_VALIDATION_MSG.string('Nomor run')),
+		regex(/^\d+$/, ID_MSG),
+		transform((value) => Number(value)),
+		integer(ID_MSG),
+		minValue(1, ID_MSG)
+	)
+});
+export type TRunNumberParamValidation = InferOutput<typeof runNumberParamValidation>;
+
+const ISO_DATE_MSG = 'Waktu harus format ISO 8601.';
+const isoDateTime = pipe(string(ISO_DATE_MSG), regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/, ISO_DATE_MSG));
+
+const createRunValidation = object({
+	result: picklist([...SESSION_RESULTS], 'Hasil run harus salah satu dari PASS, FAIL, atau BLOCKED.'),
+	actual_result: nullish(
+		pipe(string(ERROR_VALIDATION_MSG.string('Actual result')), maxLength(5000, ERROR_VALIDATION_MSG.maxLength('Actual result', 5000)))
+	),
+	executed_steps: nullish(pipe(number(ERROR_VALIDATION_MSG.number('Executed steps')), integer(ID_MSG), minValue(0, ID_MSG))),
+	error: nullish(pipe(string(ERROR_VALIDATION_MSG.string('Error')), maxLength(5000, ERROR_VALIDATION_MSG.maxLength('Error', 5000)))),
+	started_at: nullish(isoDateTime),
+	ended_at: nullish(isoDateTime)
+});
+export type TCreateRunValidation = InferOutput<typeof createRunValidation>;
+
 export default {
+	runNumberParamValidation,
+	createRunValidation,
 	createSessionValidation,
 	sessionIdParamValidation,
 	endSessionValidation,
