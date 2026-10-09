@@ -32,7 +32,8 @@ export const createProjectUseCase = async (ctx: {
 		baseUrl: ctx.input.base_url ?? null,
 		repoUrl: ctx.input.repo_url ?? null,
 		isActive: ctx.input.is_active ?? true,
-		createdByUserId: ctx.userId
+		createdByUserId: ctx.userId,
+		metadata: domain.pickProjectMetadata(ctx.input)
 	});
 
 	const created = await queries.findProjectById(idProject);

@@ -98,6 +98,7 @@ export const singleTestCaseItemValidation = object({
 	process_no: optional(pipe(string(), maxLength(50))),
 	test_type: optional(pipe(string(), maxLength(10))),
 	test_variable: optional(pipe(string(), maxLength(255))),
+	scenario: optional(string()),
 	pre_condition: optional(string()),
 	test_data: optional(string()),
 	test_steps: optional(string()),
@@ -106,7 +107,8 @@ export const singleTestCaseItemValidation = object({
 	status: optional(pipe(string(), maxLength(30))),
 	evidence: optional(string()),
 	remarks: optional(string()),
-	automation_tools: optional(pipe(string(), maxLength(100)))
+	automation_tools: optional(pipe(string(), maxLength(100))),
+	test_date: optional(pipe(string(), maxLength(50)))
 });
 export type TSingleTestCaseItemValidation = InferOutput<typeof singleTestCaseItemValidation>;
 
@@ -122,6 +124,7 @@ export const updateTestCaseValidation = object({
 	process_no: optional(pipe(string(), maxLength(50))),
 	test_type: optional(pipe(string(), maxLength(10))),
 	test_variable: optional(pipe(string(), maxLength(255))),
+	scenario: optional(string()),
 	pre_condition: optional(string()),
 	test_data: optional(string()),
 	test_steps: optional(string()),
@@ -130,9 +133,23 @@ export const updateTestCaseValidation = object({
 	status: optional(pipe(string(), maxLength(30))),
 	evidence: optional(string()),
 	remarks: optional(string()),
-	automation_tools: optional(pipe(string(), maxLength(100)))
+	automation_tools: optional(pipe(string(), maxLength(100))),
+	test_date: optional(pipe(string(), maxLength(50)))
 });
 export type TUpdateTestCaseValidation = InferOutput<typeof updateTestCaseValidation>;
+
+export const exportTestCasesValidation = object({
+	template: optional(
+		pipe(
+			string(ERROR_VALIDATION_MSG.string('Template')),
+			regex(/^\d+$/, 'ID template tidak valid.'),
+			transform((value) => Number(value)),
+			integer('ID template tidak valid.'),
+			minValue(1, 'ID template tidak valid.')
+		)
+	)
+});
+export type TExportTestCasesValidation = InferOutput<typeof exportTestCasesValidation>;
 
 export const importTestCasesValidation = object({
 	items: array(singleTestCaseItemValidation)
@@ -145,5 +162,6 @@ export default {
 	listTestCaseValidation,
 	createTestCaseValidation,
 	updateTestCaseValidation,
-	importTestCasesValidation
+	importTestCasesValidation,
+	exportTestCasesValidation
 };

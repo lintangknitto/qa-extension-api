@@ -34,7 +34,8 @@ export const updateProjectUseCase = async (ctx: {
 		description: ctx.input.description,
 		baseUrl: ctx.input.base_url,
 		repoUrl: ctx.input.repo_url,
-		isActive: ctx.input.is_active
+		isActive: ctx.input.is_active,
+		metadata: domain.pickProjectMetadata(ctx.input)
 	});
 
 	const updated = await queries.findProjectById(ctx.idProject);

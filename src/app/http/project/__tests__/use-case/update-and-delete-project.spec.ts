@@ -45,6 +45,23 @@ describe('Project Use Cases — Update & Delete', () => {
 			expect(result.name).toBe('Old Name'); // from mock return
 		});
 
+		it('meneruskan metadata header V4 ke repo (kosong → null, tidak dikirim → tidak diubah)', async () => {
+			mockedQueries.findProjectById.mockResolvedValue({ id_project: 1, name: 'P', code: 'p', is_active: 1 });
+			mockedRepo.updateProject.mockResolvedValue();
+
+			const result = await updateProjectUseCase({
+				userId: 99,
+				userLevel: 'ADMIN',
+				idProject: 1,
+				input: { tester_name: 'Hana', brd_id: 'BRD608', ip_dev: '' }
+			});
+
+			expect(mockedRepo.updateProject).toHaveBeenCalledWith(1, expect.objectContaining({
+				metadata: { tester_name: 'Hana', brd_id: 'BRD608', ip_dev: null }
+			}));
+			expect(result).toHaveProperty('tester_name');
+		});
+
 		it('mengizinkan QA jika creator project', async () => {
 			mockedQueries.findProjectById.mockResolvedValue({
 				id_project: 2,

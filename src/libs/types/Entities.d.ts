@@ -34,8 +34,34 @@ declare namespace Entity {
 		description?: string | null
 		base_url?: string | null
 		repo_url?: string | null
+		release_version?: string | null
+		test_app_folder?: string | null
+		ip_dev?: string | null
+		ip_prod?: string | null
+		tester_name?: string | null
+		programmer_name?: string | null
+		task_dev?: string | null
+		brd_id?: string | null
+		link_task_pb?: string | null
+		link_figma?: string | null
 		is_active?: boolean | number
 		created_by_user_id?: number | null
+		created_at?: string
+		updated_at?: string
+	}
+
+	interface IQaTestCaseTemplate {
+		id_template?: number
+		version_label?: string
+		name?: string
+		spreadsheet_url?: string
+		gid?: string | null
+		column_mapping?: Record<string, { header: string; aliases?: string[] }>
+		export_anchors?: Record<string, unknown>
+		is_default?: boolean
+		is_active?: boolean
+		created_by_user_id?: number | null
+		updated_by_user_id?: number | null
 		created_at?: string
 		updated_at?: string
 	}
@@ -52,6 +78,7 @@ declare namespace Entity {
 		test_type?: string
 		test_case_id?: string
 		test_variable?: string | null
+		scenario?: string | null
 		title?: string
 		pre_condition?: string | null
 		test_data?: string | null
@@ -62,6 +89,7 @@ declare namespace Entity {
 		evidence?: string | null
 		remarks?: string | null
 		automation_tools?: string | null
+		test_date?: string | null
 		last_session_id?: number | null
 		created_by_user_id?: number | null
 		created_at?: string

@@ -11,6 +11,33 @@ import {
 export const PROJECT_CODE_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const PROJECT_CODE_MAX_LENGTH = 60;
 
+/** Kolom metadata header format test case V4 di tabel projects. */
+export const PROJECT_METADATA_FIELDS = [
+	'release_version',
+	'test_app_folder',
+	'ip_dev',
+	'ip_prod',
+	'tester_name',
+	'programmer_name',
+	'task_dev',
+	'brd_id',
+	'link_task_pb',
+	'link_figma'
+] as const;
+export type TProjectMetadataField = (typeof PROJECT_METADATA_FIELDS)[number];
+export type TProjectMetadata = Partial<Record<TProjectMetadataField, string | null>>;
+
+/** Ambil field metadata yang dikirim; string kosong disimpan sebagai NULL. */
+export const pickProjectMetadata = (input: Partial<Record<TProjectMetadataField, string | null | undefined>>): TProjectMetadata => {
+	const metadata: TProjectMetadata = {};
+	for (const field of PROJECT_METADATA_FIELDS) {
+		const value = input[field];
+		if (value === undefined) continue;
+		metadata[field] = value === null || value.trim() === '' ? null : value.trim();
+	}
+	return metadata;
+};
+
 /**
  * Mengubah nama project menjadi kode yang stabil dan aman dipakai di URL/object key.
  */
@@ -116,6 +143,7 @@ export const toProjectResponse = (project: Entity.IQaProject) => {
 		description: project.description ?? null,
 		base_url: project.base_url ?? null,
 		repo_url: project.repo_url ?? null,
+		...Object.fromEntries(PROJECT_METADATA_FIELDS.map((field) => [field, project[field] ?? null])) as Record<TProjectMetadataField, string | null>,
 		is_active: project.is_active === 1 || project.is_active === true,
 		created_by_user_id: project.created_by_user_id ? Number(project.created_by_user_id) : null,
 		created_at: project.created_at ?? null,

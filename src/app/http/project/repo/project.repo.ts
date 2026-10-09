@@ -1,5 +1,6 @@
 import postgresConnection from '@/libs/config/postgresConnection';
 import type { PoolClient } from 'pg';
+import { PROJECT_METADATA_FIELDS, type TProjectMetadata } from '../domain/project.domain';
 
 const syncProjectPrograms = async (
 	client: PoolClient,
@@ -30,6 +31,7 @@ export const insertProject = async (fields: {
 	repoUrl?: string | null;
 	isActive: boolean;
 	createdByUserId?: number | null;
+	metadata?: TProjectMetadata;
 }): Promise<number> => {
 	const programIds = fields.programIds && fields.programIds.length > 0
 		? fields.programIds
@@ -38,8 +40,9 @@ export const insertProject = async (fields: {
 			: [];
 	return postgresConnection.transaction(async (client) => {
 		const { rows } = await client.query<{ id_project: number | string }>(
-			`INSERT INTO projects (name, code, id_program, description, base_url, repo_url, is_active, created_by_user_id)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			`INSERT INTO projects (name, code, id_program, description, base_url, repo_url, is_active, created_by_user_id,
+				${PROJECT_METADATA_FIELDS.join(', ')})
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${PROJECT_METADATA_FIELDS.map((_, i) => `$${i + 9}`).join(', ')})
 			 RETURNING id_project`,
 			[
 				fields.name,
@@ -49,7 +52,8 @@ export const insertProject = async (fields: {
 				fields.baseUrl ?? null,
 				fields.repoUrl ?? null,
 				Boolean(fields.isActive),
-				fields.createdByUserId ?? null
+				fields.createdByUserId ?? null,
+				...PROJECT_METADATA_FIELDS.map((field) => fields.metadata?.[field] ?? null)
 			]
 		);
 		const idProject = Number(rows[0]?.id_project);
@@ -70,6 +74,7 @@ export const updateProject = async (
 		baseUrl?: string | null;
 		repoUrl?: string | null;
 		isActive?: boolean;
+		metadata?: TProjectMetadata;
 	}
 ): Promise<void> => {
 	const assignments: string[] = ['updated_at = CURRENT_TIMESTAMP'];
@@ -102,6 +107,12 @@ export const updateProject = async (
 	if (fields.isActive !== undefined) {
 		params.push(Boolean(fields.isActive));
 		assignments.push(`is_active = $${params.length}`);
+	}
+	for (const field of PROJECT_METADATA_FIELDS) {
+		const value = fields.metadata?.[field];
+		if (value === undefined) continue;
+		params.push(value);
+		assignments.push(`${field} = $${params.length}`);
 	}
 
 	params.push(idProject);

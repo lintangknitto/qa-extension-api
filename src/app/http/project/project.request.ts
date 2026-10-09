@@ -48,6 +48,23 @@ const programIdsSchema = pipe(
 	transform((values) => values.map(Number))
 );
 
+const metadataText = (label: string, max: number) =>
+	optional(nullish(pipe(string(ERROR_VALIDATION_MSG.string(label)), maxLength(max, ERROR_VALIDATION_MSG.maxLength(label, max)))));
+
+/** Metadata header format test case V4 (opsional; kosong saat ekspor ditulis `-`). */
+const projectMetadataEntries = {
+	release_version: metadataText('Versi rilis', 100),
+	test_app_folder: metadataText('Folder test app', 255),
+	ip_dev: metadataText('IP Dev', 100),
+	ip_prod: metadataText('IP Prod', 100),
+	tester_name: metadataText('Tester', 150),
+	programmer_name: metadataText('Programmer', 150),
+	task_dev: metadataText('Task dev', 255),
+	brd_id: metadataText('BRD ID', 100),
+	link_task_pb: metadataText('Link task PB', 500),
+	link_figma: metadataText('Link Figma', 500)
+};
+
 const createProjectValidation = object({
 	id_program: optional(nullish(programIdSchema)),
 	program_ids: optional(nullish(programIdsSchema)),
@@ -69,7 +86,8 @@ const createProjectValidation = object({
 	repo_url: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Repo URL')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Repo URL', 500)))
 	),
-	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif')))
+	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif'))),
+	...projectMetadataEntries
 });
 export type TCreateProjectValidation = InferOutput<typeof createProjectValidation>;
 
@@ -95,7 +113,8 @@ const updateProjectValidation = object({
 	repo_url: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Repo URL')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Repo URL', 500)))
 	),
-	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif')))
+	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif'))),
+	...projectMetadataEntries
 });
 export type TUpdateProjectValidation = InferOutput<typeof updateProjectValidation>;
 

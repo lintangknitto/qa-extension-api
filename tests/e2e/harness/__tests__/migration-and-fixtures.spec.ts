@@ -37,6 +37,7 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 		// 1. First run on empty database
 		const firstRunOutput = execSync(`pnpm exec tsx "${migrateScriptPath}"`, { env, encoding: 'utf-8' });
 		expect(firstRunOutput).toContain('Applying 001_init_schema.sql');
+		expect(firstRunOutput).toContain('Applying 002_test_case_templates_v4.sql');
 		expect(firstRunOutput).toContain('Database migrations are up to date.');
 
 		const pool = new Pool({
@@ -50,10 +51,18 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 		try {
 			// Verifikasi tabel migration history
 			const migRows = await pool.query<{ version: string; checksum: string }>(
-				'SELECT version, checksum FROM schema_migrations'
+				'SELECT version, checksum FROM schema_migrations ORDER BY version'
 			);
-			expect(migRows.rows.length).toBe(1);
-			expect(migRows.rows[0].version).toBe('001_init_schema.sql');
+			expect(migRows.rows.map((r) => r.version)).toEqual(['001_init_schema.sql', '002_test_case_templates_v4.sql']);
+
+			// Seed template V4 default
+			const templateRows = await pool.query<{ version_label: string; is_default: boolean; gid: string; columns: string }>(
+				`SELECT version_label, is_default, gid, (SELECT COUNT(*) FROM jsonb_object_keys(column_mapping)) AS columns
+				 FROM test_case_templates`
+			);
+			expect(templateRows.rows).toEqual([
+				{ version_label: 'V4', is_default: true, gid: '1730053292', columns: '17' }
+			]);
 
 			// Verifikasi ekstensi pgvector
 			const extRows = await pool.query<{ extname: string }>(
@@ -78,13 +87,16 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			expect(tableNames).toContain('recording_artifacts');
 			expect(tableNames).toContain('recording_generations');
 
-			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 1)
+			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 2, seed V4 tidak dobel)
 			const secondRunOutput = execSync(`pnpm exec tsx "${migrateScriptPath}"`, { env, encoding: 'utf-8' });
 			expect(secondRunOutput).not.toContain('Applying 001_init_schema.sql');
+			expect(secondRunOutput).not.toContain('Applying 002_test_case_templates_v4.sql');
 			expect(secondRunOutput).toContain('Database migrations are up to date.');
 
 			const migRowsAfter = await pool.query('SELECT COUNT(*) AS total FROM schema_migrations');
-			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(1);
+			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(2);
+			const templateCountAfter = await pool.query('SELECT COUNT(*) AS total FROM test_case_templates');
+			expect(parseInt(templateCountAfter.rows[0].total, 10)).toBe(1);
 		} finally {
 			await pool.end();
 		}

@@ -19,8 +19,8 @@ export const findTestCasesByProject = async (
 
 	if (filter.search) {
 		const searchPattern = `%${filter.search.trim()}%`;
-		conditions.push('(tc.test_case_id ILIKE ? OR tc.title ILIKE ? OR tc.feature ILIKE ? OR tc.test_variable ILIKE ? OR prg.name ILIKE ?)');
-		params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+		conditions.push('(tc.test_case_id ILIKE ? OR tc.title ILIKE ? OR tc.scenario ILIKE ? OR tc.feature ILIKE ? OR tc.test_variable ILIKE ? OR prg.name ILIKE ?)');
+		params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
 	}
 
 	if (filter.status) {
@@ -74,8 +74,8 @@ export const countTestCasesByProject = async (
 
 	if (filter.search) {
 		const searchPattern = `%${filter.search.trim()}%`;
-		conditions.push('(tc.test_case_id ILIKE ? OR tc.title ILIKE ? OR tc.feature ILIKE ? OR tc.test_variable ILIKE ? OR prg.name ILIKE ?)');
-		params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+		conditions.push('(tc.test_case_id ILIKE ? OR tc.title ILIKE ? OR tc.scenario ILIKE ? OR tc.feature ILIKE ? OR tc.test_variable ILIKE ? OR prg.name ILIKE ?)');
+		params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
 	}
 
 	if (filter.status) {
