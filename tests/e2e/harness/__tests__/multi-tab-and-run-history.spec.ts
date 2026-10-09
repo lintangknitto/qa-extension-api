@@ -399,6 +399,56 @@ describe('Video multi-tab & riwayat re-run (test-matrix PB-1..PB-5)', () => {
 		for (const page of harness.context.pages()) if (page !== control) await page.close();
 	});
 
+	it('TC4-3: satu langkah upload 3 file → isi dikirim per file, semua tersimpan, re-run memasang ketiganya', async () => {
+		const idSession = await createSession('Upload banyak', 'TC-UPLOAD-MULTI');
+		const uploadPage = await openPage(`${fixture.baseUrl}/upload`);
+		const tabId = await tabIdOf(`${fixture.baseUrl}/upload`);
+		expect(await sendToExtension({ type: 'recordingStart', idSession, apiBaseUrl: backend.baseUrl, tabIds: [tabId], recordVideo: false })).toMatchObject({ success: true });
+
+		await uploadPage.waitForTimeout(1000);
+		const inputs = ['satu', 'dua', 'tiga'].map((word, i) => ({ name: `f${i + 1}.txt`, mimeType: 'text/plain', buffer: Buffer.from(`isi ${word}`) }));
+		await uploadPage.setInputFiles('#lampiran-multi', inputs);
+		await uploadPage.locator('#upload-multi-status').filter({ hasText: 'Terunggah 3 file' }).waitFor();
+
+		let files: any[] = [];
+		for (let i = 0; i < 30 && files.length < 3; i++) {
+			files = (await api('GET', `/sessions/${idSession}/test-data-files`)).result;
+			if (files.length < 3) await uploadPage.waitForTimeout(500);
+		}
+		expect(await sendToExtension({ type: 'recordingStop' })).toMatchObject({ success: true });
+		await endSession(idSession);
+
+		expect(files.map((f) => f.file_name).sort()).toEqual(['f1.txt', 'f2.txt', 'f3.txt']);
+		// Ketiganya terkait ke satu langkah upload yang sama.
+		expect(new Set(files.map((f) => f.sequence)).size).toBe(1);
+
+		const script = [
+			`await page.goto('${fixture.baseUrl}/upload');`,
+			"await page.getByLabel('Lampiran banyak').setInputFiles(['test-data/f1.txt', 'test-data/f2.txt', 'test-data/f3.txt']);"
+		].join('\n');
+		await uploadPage.close();
+		const res = await replay(idSession, script, { stepDelayMs: 800 });
+		expect(res.result).toMatchObject({ success: true });
+		expect(fixture.lastMultiUpload()).toEqual(inputs.map((f) => ({ name: f.name, type: 'text/plain', data: f.buffer.toString('base64') })));
+		for (const page of harness.context.pages()) if (page !== control) await page.close();
+	});
+
+	it('TC1-2: nama video dengan TC 80 karakter + judul emoji → upload & complete berhasil, nama utuh di key', async () => {
+		const testCaseNo = 'TC-' + 'X'.repeat(77);
+		const idSession = await createSession('\u{1F600}'.repeat(120) + ' akhir', testCaseNo);
+		const video = Buffer.from('1A45DFA3', 'hex');
+		const presign = await api('POST', `/sessions/${idSession}/video/presign-upload`, { size_bytes: video.length, content_type: 'video/webm' });
+		expect(presign.status).toBe(201);
+		const name: string = presign.result.object_key.split('/').pop();
+		expect(name.startsWith(testCaseNo + ' - \u{1F600}')).toBe(true);
+		expect(name.length).toBeLessThanOrEqual(150);
+		expect(() => decodeURIComponent(encodeURIComponent(name))).not.toThrow();
+		expect((await fetch(presign.result.upload_url, { method: 'PUT', headers: { 'Content-Type': 'video/webm' }, body: video })).status).toBe(200);
+		const complete = await api('POST', `/sessions/${idSession}/video/complete`, { object_key: presign.result.object_key });
+		expect(complete.status).toBeLessThan(300);
+		await endSession(idSession);
+	});
+
 	// ------------------------------------------------------------ PB-5 HUD replay
 	it('TC5-1: HUD error replay bisa ditutup ✕ dan hilang sendiri setelah 10 detik', async () => {
 		const failingScript = [`await page.goto('${fixture.baseUrl}/checkout');`, "await page.locator('#tidak-ada').click();"].join('\n');

@@ -8,6 +8,8 @@ export interface IFixtureServer {
 	lastOrderRequestId: () => string | null;
 	/** Upload terakhir dari halaman `/upload` (nama file + isi base64). */
 	lastUpload: () => { name: string; type: string; data: string } | null;
+	/** Upload terakhir dari input multiple `/upload` (`#lampiran-multi`). */
+	lastMultiUpload: () => Array<{ name: string; type: string; data: string }> | null;
 	stop: () => Promise<void>;
 }
 
@@ -104,7 +106,22 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
   <label for="lampiran">Lampiran</label>
   <input id="lampiran" type="file" />
   <p id="upload-status" role="status"></p>
+  <label for="lampiran-multi">Lampiran banyak</label>
+  <input id="lampiran-multi" type="file" multiple />
+  <p id="upload-multi-status" role="status"></p>
   <script>
+    document.getElementById('lampiran-multi').addEventListener('change', async (event) => {
+      const files = Array.from(event.target.files || []);
+      const read = (file) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ name: file.name, type: file.type, data: String(reader.result).split(',')[1] || '' });
+        reader.readAsDataURL(file);
+      });
+      const payload = [];
+      for (const file of files) payload.push(await read(file));
+      await fetch('/api/upload-multi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      document.getElementById('upload-multi-status').textContent = 'Terunggah ' + files.length + ' file';
+    });
     document.getElementById('lampiran').addEventListener('change', (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -120,6 +137,7 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 </body></html>`;
 
 	let lastUpload: { name: string; type: string; data: string } | null = null;
+	let lastMultiUpload: Array<{ name: string; type: string; data: string }> | null = null;
 	let orderRequestCount = 0;
 	let lastOrderRequestId: string | null = null;
 	let port = 0;
@@ -141,6 +159,17 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 		if (req.url === '/upload') {
 			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 			res.end(uploadHtml);
+			return;
+		}
+
+		if (req.url === '/api/upload-multi' && req.method === 'POST') {
+			let body = '';
+			req.on('data', (chunk) => (body += chunk));
+			req.on('end', () => {
+				lastMultiUpload = JSON.parse(body);
+				res.writeHead(200, { 'Content-Type': 'application/json' });
+				res.end('{"ok":true}');
+			});
 			return;
 		}
 
@@ -191,6 +220,7 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 		baseUrl,
 		lastOrderRequestId: () => lastOrderRequestId,
 		lastUpload: () => lastUpload,
+		lastMultiUpload: () => lastMultiUpload,
 		stop: () =>
 			new Promise<void>((resolve, reject) => {
 				server.close((err) => (err ? reject(err) : resolve()));
