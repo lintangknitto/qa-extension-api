@@ -65,10 +65,11 @@ export const updateSessionShareToken = async (idSession: number, shareToken: str
 	);
 };
 
-export const updateSessionVideoUrl = async (idSession: number, videoUrl: string): Promise<void> => {
+/** `video_url` di response dihitung dari key ini saat dibaca (lihat `toSessionResponse`). */
+export const updateSessionVideoObjectKey = async (idSession: number, objectKey: string): Promise<void> => {
 	await postgresConnection.raw(
-		'UPDATE recording_sessions SET video_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id_session = $2',
-		[videoUrl, idSession]
+		'UPDATE recording_sessions SET video_object_key = $1, updated_at = CURRENT_TIMESTAMP WHERE id_session = $2',
+		[objectKey, idSession]
 	);
 };
 

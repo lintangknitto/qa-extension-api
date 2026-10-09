@@ -41,6 +41,25 @@ export interface IDisposableStackEndpoints {
 	};
 }
 
+/** Policy anonim read+write setara `mc anonymous set public`. */
+export const publicBucketPolicy = (bucket: string) => ({
+	Version: '2012-10-17',
+	Statement: [
+		{
+			Effect: 'Allow',
+			Principal: { AWS: ['*'] },
+			Action: ['s3:GetBucketLocation', 's3:ListBucket', 's3:ListBucketMultipartUploads'],
+			Resource: [`arn:aws:s3:::${bucket}`]
+		},
+		{
+			Effect: 'Allow',
+			Principal: { AWS: ['*'] },
+			Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts'],
+			Resource: [`arn:aws:s3:::${bucket}/*`]
+		}
+	]
+});
+
 export class DisposableStack {
 	private readonly composeFile: string;
 	private readonly projectName: string;
@@ -258,6 +277,8 @@ export class DisposableStack {
 		if (!exists) {
 			await client.makeBucket(minioConfig.bucket, 'us-east-1');
 		}
+		// Sama dengan infra (`mc anonymous set public`): bucket public read+write, URL tanpa signature.
+		await client.setBucketPolicy(minioConfig.bucket, JSON.stringify(publicBucketPolicy(minioConfig.bucket)));
 	}
 
 	public stopSync(): void {

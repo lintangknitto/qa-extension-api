@@ -24,9 +24,7 @@ const authorizeMiddleware = (
 		return validPath && validMethod;
 	});
 
-	const isVideoStream = req.method.toLowerCase() === 'get' && req.path.includes('/video/stream');
-
-	if (isGuest || isVideoStream) {
+	if (isGuest) {
 		next();
 		return;
 	}

@@ -80,6 +80,15 @@ describe('session.domain', () => {
 			expect(response.result).toBeNull();
 			expect(response.ended_at).toBeNull();
 		});
+
+		it('menghitung video_url publik dari video_object_key, bukan dari video_url presigned lama', () => {
+			const response = domain.toSessionResponse(
+				session({ video_url: 'http://127.0.0.1:9000/b/x?X-Amz-Signature=old', video_object_key: 'sessions/1/video/a.webm' })
+			);
+			expect(response.video_url).toMatch(/\/qa-recording-artifacts\/sessions\/1\/video\/a\.webm$/);
+			expect(response.video_url).not.toContain('X-Amz');
+			expect(domain.toSessionResponse(session({ video_url: 'http://old', video_object_key: null })).video_url).toBeNull();
+		});
 	});
 
 	describe('toCheckpointResponse', () => {

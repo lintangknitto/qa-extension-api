@@ -1,18 +1,16 @@
-import { InvalidParameterException, NotFoundException } from '@knittotextile/knitto-core-backend/dist/CoreException';
+import { InvalidParameterException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 import { PROJECT_ADMIN_LEVELS } from '@/libs/config';
-import {
-	createPresignedPutUrl,
-	createPresignedGetUrl,
-	statArtifactObject,
-	getArtifactObjectStream,
-	getArtifactObjectRange,
-	putArtifactObjectBuffer
-} from '@/libs/config/minioClient';
+import { randomUUID } from 'node:crypto';
+import { buildPublicObjectUrl, statArtifactObject, putArtifactObjectBuffer } from '@/libs/config/minioClient';
 import * as sessionQueries from '../queries/session.queries';
 import * as sessionDomain from '../domain/session.domain';
 import * as sessionRepo from '../repo/session.repo';
 
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB
+
+const videoKeyPrefix = (idSession: number) => `sessions/${idSession}/video/`;
+/** UUID, bukan session+timestamp: bucket bisa ditulis publik, key yang bisa ditebak memudahkan penimpaan. */
+export const buildVideoObjectKey = (idSession: number): string => `${videoKeyPrefix(idSession)}${randomUUID()}.webm`;
 
 export const uploadSessionVideoDirectUseCase = async (ctx: {
 	idSession: number;
@@ -29,17 +27,14 @@ export const uploadSessionVideoDirectUseCase = async (ctx: {
 	}
 
 	const contentType = ctx.contentType || 'video/webm';
-	const timestamp = Date.now();
-	const objectKey = `sessions/${session.id_project || 0}/${ctx.idSession}-video-${timestamp}.webm`;
+	const objectKey = buildVideoObjectKey(ctx.idSession);
 
 	await putArtifactObjectBuffer(objectKey, ctx.videoBuffer, contentType);
-
-	const streamingUrl = await createPresignedGetUrl(objectKey, 7 * 24 * 3600);
-	await sessionRepo.updateSessionVideoUrl(ctx.idSession, streamingUrl);
+	await sessionRepo.updateSessionVideoObjectKey(ctx.idSession, objectKey);
 
 	return {
 		id_session: ctx.idSession,
-		video_url: streamingUrl,
+		video_url: buildPublicObjectUrl(objectKey),
 		object_key: objectKey,
 		size_bytes: ctx.videoBuffer.length
 	};
@@ -59,13 +54,10 @@ export const presignSessionVideoUseCase = async (ctx: {
 	}
 
 	const contentType = ctx.input.content_type || 'video/webm';
-	const timestamp = Date.now();
-	const objectKey = `sessions/${session.id_project || 0}/${ctx.idSession}-video-${timestamp}.webm`;
-
-	const uploadUrl = await createPresignedPutUrl(objectKey, 3600);
+	const objectKey = buildVideoObjectKey(ctx.idSession);
 
 	return {
-		upload_url: uploadUrl,
+		upload_url: buildPublicObjectUrl(objectKey),
 		object_key: objectKey,
 		content_type: contentType,
 		expires_in: 3600
@@ -81,24 +73,24 @@ export const completeSessionVideoUseCase = async (ctx: {
 	const session = sessionDomain.assertSessionExists(await sessionQueries.findSessionById(ctx.idSession));
 	sessionDomain.assertCanAccessSession(session, ctx.userId, ctx.userLevel, PROJECT_ADMIN_LEVELS);
 
-	const expectedPrefix = `sessions/${session.id_project || 0}/${ctx.idSession}-video-`;
-	if (!ctx.input.object_key || !ctx.input.object_key.startsWith(expectedPrefix)) {
+	const objectKey = ctx.input.object_key;
+	const prefix = videoKeyPrefix(ctx.idSession);
+	if (!objectKey?.startsWith(prefix) || !/^[0-9a-f-]{36}\.webm$/.test(objectKey.slice(prefix.length))) {
 		throw new InvalidParameterException('Object key tidak valid untuk sesi ini.');
 	}
 
 	try {
-		await statArtifactObject(ctx.input.object_key);
+		await statArtifactObject(objectKey);
 	} catch {
 		throw new InvalidParameterException('File video belum berhasil terunggah ke storage MinIO.');
 	}
 
-	const streamingUrl = await createPresignedGetUrl(ctx.input.object_key, 7 * 24 * 3600);
-	await sessionRepo.updateSessionVideoUrl(ctx.idSession, streamingUrl);
+	await sessionRepo.updateSessionVideoObjectKey(ctx.idSession, objectKey);
 
 	return {
 		id_session: ctx.idSession,
-		video_url: streamingUrl,
-		object_key: ctx.input.object_key
+		video_url: buildPublicObjectUrl(objectKey),
+		object_key: objectKey
 	};
 };
 
@@ -112,70 +104,6 @@ export const getSessionVideoUrlUseCase = async (ctx: {
 
 	return {
 		id_session: ctx.idSession,
-		video_url: session.video_url || null
+		video_url: session.video_object_key ? buildPublicObjectUrl(session.video_object_key) : null
 	};
 };
-
-export interface IVideoRange {
-	start: number;
-	end: number;
-}
-
-/**
- * Parse header `Range: bytes=start-end` (satu rentang). `null` = kirim utuh;
- * `'unsatisfiable'` = rentang di luar ukuran file (HTTP 416).
- */
-export const parseVideoRange = (header: string | undefined, size: number): IVideoRange | null | 'unsatisfiable' => {
-	const match = header?.match(/^bytes=(\d*)-(\d*)$/);
-	if (!match || (match[1] === '' && match[2] === '')) return null;
-	let start: number;
-	let end: number;
-	if (match[1] === '') {
-		// bytes=-N → N byte terakhir
-		start = Math.max(0, size - Number(match[2]));
-		end = size - 1;
-	} else {
-		start = Number(match[1]);
-		end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1);
-	}
-	if (start >= size || start > end) return 'unsatisfiable';
-	return { start, end };
-};
-
-/** Object key MinIO dari `video_url` presigned (host/tanda tangan diabaikan); `null` bila tidak dikenali. */
-export const videoObjectKeyFromUrl = (videoUrl: string): string | null => videoUrl.match(/sessions\/\d+\/[^?&]+/)?.[0] ?? null;
-
-const videoObjectKeyOf = (session: Entity.IQaRecordingSession): string => {
-	if (!session.video_url) throw new NotFoundException('Sesi ini belum memiliki rekaman video.');
-	return videoObjectKeyFromUrl(session.video_url) ?? `sessions/${session.id_project || 0}/${session.id_session}-video`;
-};
-
-const streamVideoOf = async (session: Entity.IQaRecordingSession, rangeHeader?: string) => {
-	const objectKey = videoObjectKeyOf(session);
-	const stat = await statArtifactObject(objectKey);
-	const contentType = stat.metaData?.['content-type'] || 'video/webm';
-	const range = parseVideoRange(rangeHeader, stat.size);
-	if (range === 'unsatisfiable') return { kind: 'unsatisfiable' as const, size: stat.size, contentType };
-	if (range) {
-		const stream = await getArtifactObjectRange(objectKey, range.start, range.end - range.start + 1);
-		return { kind: 'partial' as const, stream, size: stat.size, range, contentType };
-	}
-	return { kind: 'full' as const, stream: await getArtifactObjectStream(objectKey), size: stat.size, contentType };
-};
-
-export type TVideoStream = Awaited<ReturnType<typeof streamVideoOf>>;
-
-export const streamSessionVideoUseCase = async (ctx: { idSession: number; range?: string }) =>
-	streamVideoOf(sessionDomain.assertSessionExists(await sessionQueries.findSessionById(ctx.idSession)), ctx.range);
-
-/**
- * Video untuk halaman share: diotorisasi share token dan di-stream lewat API, sehingga
- * bisa diputar dari komputer lain (URL presigned MinIO menunjuk host internal/127.0.0.1
- * dan kedaluwarsa).
- */
-export const streamSharedSessionVideoUseCase = async (ctx: { shareToken: string; range?: string }) => {
-	const session = await sessionQueries.findSessionByShareToken(ctx.shareToken);
-	if (!session) throw new NotFoundException('Sesi rekaman dengan share token ini tidak ditemukan.');
-	return streamVideoOf(session, ctx.range);
-};
-

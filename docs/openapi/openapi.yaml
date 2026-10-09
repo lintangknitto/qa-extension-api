@@ -944,7 +944,8 @@ paths:
   /sessions/{id_session}/video/presign-upload:
     post:
       tags: [sessions]
-      summary: Buat presigned URL untuk upload video
+      summary: Buat URL upload video
+      description: URL upload publik tanpa signature (bucket MinIO public read+write). Object key `sessions/<id_session>/video/<uuid>.webm`.
       operationId: postSessionVideoPresign
       parameters:
         - $ref: '#/components/parameters/SessionId'
@@ -1039,32 +1040,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
-  /sessions/{id_session}/video/stream:
-    get:
-      tags: [sessions]
-      summary: Stream video sesi
-      operationId: getSessionVideoStream
-      parameters:
-        - $ref: '#/components/parameters/SessionId'
-      responses:
-        '200':
-          description: Konten video
-          content:
-            video/webm:
-              schema: { type: string, format: binary }
-  /api/v1/sessions/{id_session}/video/stream:
-    get:
-      tags: [sessions]
-      summary: Alias versi stream video sesi
-      operationId: getSessionVideoStreamV1
-      parameters:
-        - $ref: '#/components/parameters/SessionId'
-      responses:
-        '200':
-          description: Konten video
-          content:
-            video/webm:
-              schema: { type: string, format: binary }
   /sessions/{id_session}/artifacts:
     get:
       tags: [artifacts]
@@ -1094,7 +1069,8 @@ paths:
   /sessions/{id_session}/artifacts/presign-upload:
     post:
       tags: [artifacts]
-      summary: Buat presigned URL upload artifact
+      summary: Buat URL upload artifact
+      description: URL upload publik tanpa signature (bucket MinIO public read+write). `expires_in` dipertahankan demi kompatibilitas.
       operationId: postSessionArtifactPresign
       parameters:
         - $ref: '#/components/parameters/SessionId'
@@ -1169,6 +1145,7 @@ paths:
     get:
       tags: [artifacts]
       summary: Buat URL download artifact
+      description: URL publik MinIO tanpa signature (bucket public read).
       operationId: getSessionArtifactDownloadUrl
       parameters:
         - $ref: '#/components/parameters/SessionId'

@@ -35,6 +35,7 @@ export const startBackendService = async (
 		MINIO_SECRET_KEY: endpoints.minio.secretKey,
 		MINIO_BUCKET: endpoints.minio.bucket,
 		MINIO_USE_SSL: 'false',
+		MINIO_PUBLIC_BASE_URL: `http://${endpoints.minio.host}:${endpoints.minio.port}`,
 		OPENAI_BASE_URL: endpoints.mockAi.baseUrl,
 		OPENAI_API_KEY: 'e2e-fake-mock-key',
 		OPENAI_MODEL: 'mock-gpt-4o',

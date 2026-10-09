@@ -6,10 +6,7 @@ import {
 import {
 	presignSessionVideoUseCase,
 	completeSessionVideoUseCase,
-	getSessionVideoUrlUseCase,
-	parseVideoRange,
-	videoObjectKeyFromUrl,
-	streamSharedSessionVideoUseCase
+	getSessionVideoUrlUseCase
 } from '../../use-case/session-video.use-case';
 import * as sessionQueries from '../../queries/session.queries';
 import * as sessionRepo from '../../repo/session.repo';
@@ -30,8 +27,11 @@ describe('Session Video Use Cases (MinIO)', () => {
 		video_url: null
 	};
 
+	const VALID_KEY = 'sessions/1/video/0f8fad5b-d9cb-469f-a165-70867728950e.webm';
+
 	beforeEach(() => {
 		jest.clearAllMocks();
+		(minioClient.buildPublicObjectUrl as jest.Mock).mockImplementation((key: string) => `http://minio.pub/bucket/${key}`);
 	});
 
 	describe('presignSessionVideoUseCase', () => {
@@ -48,9 +48,8 @@ describe('Session Video Use Cases (MinIO)', () => {
 			).rejects.toThrow(InvalidParameterException);
 		});
 
-		it('menghasilkan presigned PUT URL dan object key yang valid', async () => {
+		it('menghasilkan URL upload publik tanpa signature dan object key UUID', async () => {
 			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue(mockSession);
-			(minioClient.createPresignedPutUrl as jest.Mock).mockResolvedValue('http://minio:9000/upload-put-url');
 
 			const result = await presignSessionVideoUseCase({
 				idSession: 1,
@@ -59,10 +58,9 @@ describe('Session Video Use Cases (MinIO)', () => {
 				input: { size_bytes: 5 * 1024 * 1024, content_type: 'video/webm' }
 			});
 
-			expect(result.upload_url).toBe('http://minio:9000/upload-put-url');
-			expect(result.object_key).toMatch(/^sessions\/10\/1-video-\d+\.webm$/);
+			expect(result.object_key).toMatch(/^sessions\/1\/video\/[0-9a-f-]{36}\.webm$/);
+			expect(result.upload_url).toBe(`http://minio.pub/bucket/${result.object_key}`);
 			expect(result.content_type).toBe('video/webm');
-			expect(minioClient.createPresignedPutUrl).toHaveBeenCalledWith(result.object_key, 3600);
 		});
 
 		it('melempar NotFoundException jika idSession tidak ditemukan', async () => {
@@ -101,9 +99,19 @@ describe('Session Video Use Cases (MinIO)', () => {
 					idSession: 1,
 					userId: 5,
 					userLevel: 'QA',
-					input: { object_key: 'sessions/99/99-video-123.webm' }
+					input: { object_key: 'sessions/99/video/0f8fad5b-d9cb-469f-a165-70867728950e.webm' }
 				})
 			).rejects.toThrow('Object key tidak valid untuk sesi ini.');
+		});
+
+		it('menolak format key lama (session+timestamp) dan path traversal', async () => {
+			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue(mockSession);
+			for (const object_key of ['sessions/10/1-video-123.webm', 'sessions/1/video/../../x.webm', 'sessions/1/video/abc.webm']) {
+				await expect(
+					completeSessionVideoUseCase({ idSession: 1, userId: 5, userLevel: 'QA', input: { object_key } })
+				).rejects.toThrow('Object key tidak valid untuk sesi ini.');
+			}
+			expect(minioClient.statArtifactObject).not.toHaveBeenCalled();
 		});
 
 		it('melempar error jika objek video belum ada di storage MinIO', async () => {
@@ -115,34 +123,35 @@ describe('Session Video Use Cases (MinIO)', () => {
 					idSession: 1,
 					userId: 5,
 					userLevel: 'QA',
-					input: { object_key: 'sessions/10/1-video-123.webm' }
+					input: { object_key: VALID_KEY }
 				})
 			).rejects.toThrow(InvalidParameterException);
 		});
 
-		it('memverifikasi objek di MinIO, men-generate streaming URL, dan menyimpan ke database', async () => {
+		it('memverifikasi objek di MinIO, menyimpan object key, dan mengembalikan URL publik', async () => {
 			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue(mockSession);
 			(minioClient.statArtifactObject as jest.Mock).mockResolvedValue({ size: 5000000 });
-			(minioClient.createPresignedGetUrl as jest.Mock).mockResolvedValue('http://minio:9000/stream-video.webm');
-			(sessionRepo.updateSessionVideoUrl as jest.Mock).mockResolvedValue(undefined);
+			(sessionRepo.updateSessionVideoObjectKey as jest.Mock).mockResolvedValue(undefined);
 
 			const result = await completeSessionVideoUseCase({
 				idSession: 1,
 				userId: 5,
 				userLevel: 'QA',
-				input: { object_key: 'sessions/10/1-video-123.webm' }
+				input: { object_key: VALID_KEY }
 			});
 
-			expect(result.video_url).toBe('http://minio:9000/stream-video.webm');
-			expect(sessionRepo.updateSessionVideoUrl).toHaveBeenCalledWith(1, 'http://minio:9000/stream-video.webm');
+			expect(minioClient.statArtifactObject).toHaveBeenCalledWith(VALID_KEY);
+			expect(result.video_url).toBe(`http://minio.pub/bucket/${VALID_KEY}`);
+			expect(sessionRepo.updateSessionVideoObjectKey).toHaveBeenCalledWith(1, VALID_KEY);
 		});
 	});
 
 	describe('getSessionVideoUrlUseCase', () => {
-		it('mengembalikan video_url yang tersimpan di sesi', async () => {
+		it('menghitung video_url publik dari video_object_key (mengabaikan video_url presigned lama)', async () => {
 			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue({
 				...mockSession,
-				video_url: 'http://minio:9000/stream-video.webm'
+				video_url: 'http://127.0.0.1:9000/x?X-Amz-Signature=expired',
+				video_object_key: 'sessions/10/1-video-123.webm'
 			});
 
 			const result = await getSessionVideoUrlUseCase({
@@ -151,10 +160,10 @@ describe('Session Video Use Cases (MinIO)', () => {
 				userLevel: 'QA'
 			});
 
-			expect(result.video_url).toBe('http://minio:9000/stream-video.webm');
+			expect(result.video_url).toBe('http://minio.pub/bucket/sessions/10/1-video-123.webm');
 		});
 
-		it('mengembalikan null jika sesi belum memiliki video_url', async () => {
+		it('mengembalikan null jika sesi belum memiliki video_object_key', async () => {
 			(sessionQueries.findSessionById as jest.Mock).mockResolvedValue({
 				...mockSession,
 				video_url: null
@@ -179,56 +188,6 @@ describe('Session Video Use Cases (MinIO)', () => {
 					userLevel: 'QA'
 				})
 			).rejects.toThrow(NotFoundException);
-		});
-	});
-
-	describe('videoObjectKeyFromUrl', () => {
-		it('mengambil object key dari presigned URL host mana pun, tanpa query tanda tangan', () => {
-			expect(videoObjectKeyFromUrl('http://127.0.0.1:9000/qa-recording-artifacts/sessions/1/5-video-1.webm?X-Amz-Signature=a')).toBe('sessions/1/5-video-1.webm');
-			expect(videoObjectKeyFromUrl('http://192.168.21.38:9000/qa-recording-artifacts/sessions/0/7-video-2.webm')).toBe('sessions/0/7-video-2.webm');
-			expect(videoObjectKeyFromUrl('blob:chrome-extension://x/abc')).toBeNull();
-		});
-	});
-
-	describe('parseVideoRange', () => {
-		it('tanpa header Range → kirim utuh', () => {
-			expect(parseVideoRange(undefined, 1000)).toBeNull();
-			expect(parseVideoRange('bytes=-', 1000)).toBeNull();
-		});
-		it('rentang terbuka, tertutup, dan suffix', () => {
-			expect(parseVideoRange('bytes=0-', 1000)).toEqual({ start: 0, end: 999 });
-			expect(parseVideoRange('bytes=100-199', 1000)).toEqual({ start: 100, end: 199 });
-			expect(parseVideoRange('bytes=900-5000', 1000)).toEqual({ start: 900, end: 999 });
-			expect(parseVideoRange('bytes=-100', 1000)).toEqual({ start: 900, end: 999 });
-		});
-		it('rentang di luar ukuran file → unsatisfiable (416)', () => {
-			expect(parseVideoRange('bytes=1000-', 1000)).toBe('unsatisfiable');
-			expect(parseVideoRange('bytes=500-100', 1000)).toBe('unsatisfiable');
-		});
-	});
-
-	describe('streamSharedSessionVideoUseCase', () => {
-		const shared = { ...mockSession, video_url: 'http://127.0.0.1:9000/qa-recording-artifacts/sessions/10/1-video-123.webm?X-Amz-Signature=abc' };
-
-		it('stream lewat share token memakai object key dari video_url, dengan Range parsial', async () => {
-			(sessionQueries.findSessionByShareToken as jest.Mock).mockResolvedValue(shared);
-			(minioClient.statArtifactObject as jest.Mock).mockResolvedValue({ size: 1000, metaData: { 'content-type': 'video/webm' } });
-			(minioClient.getArtifactObjectRange as jest.Mock).mockResolvedValue('partial-stream');
-
-			const video = await streamSharedSessionVideoUseCase({ shareToken: 'tok', range: 'bytes=100-' });
-			expect(minioClient.statArtifactObject).toHaveBeenCalledWith('sessions/10/1-video-123.webm');
-			expect(minioClient.getArtifactObjectRange).toHaveBeenCalledWith('sessions/10/1-video-123.webm', 100, 900);
-			expect(video).toMatchObject({ kind: 'partial', size: 1000, range: { start: 100, end: 999 } });
-		});
-
-		it('share token tidak dikenal → NotFoundException', async () => {
-			(sessionQueries.findSessionByShareToken as jest.Mock).mockResolvedValue(null);
-			await expect(streamSharedSessionVideoUseCase({ shareToken: 'x' })).rejects.toThrow(NotFoundException);
-		});
-
-		it('sesi tanpa video → NotFoundException', async () => {
-			(sessionQueries.findSessionByShareToken as jest.Mock).mockResolvedValue(mockSession);
-			await expect(streamSharedSessionVideoUseCase({ shareToken: 'tok' })).rejects.toThrow(NotFoundException);
 		});
 	});
 });

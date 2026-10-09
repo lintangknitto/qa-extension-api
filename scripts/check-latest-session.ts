@@ -25,7 +25,7 @@ async function main(): Promise<void> {
 			console.info(`  Test Case : ${session.test_case_no ?? '-'}`);
 			console.info(`  Title     : ${session.title ?? '-'}`);
 			console.info(`  Status    : ${session.status ?? '-'}`);
-			console.info(`  Video URL : ${session.video_url ?? '(kosong)'}`);
+			console.info(`  Video key : ${session.video_object_key ?? '(kosong)'}`);
 
 			const [artifacts, generations] = await Promise.all([
 				postgresConnection.raw<Array<Record<string, unknown>>>(

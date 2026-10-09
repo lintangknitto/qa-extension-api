@@ -109,7 +109,9 @@ declare namespace Entity {
 		result?: string | null
 		actual_result?: string | null
 		share_token?: string | null
+		/** Legacy: URL presigned lama, tidak lagi ditulis. Pakai `video_object_key`. */
 		video_url?: string | null
+		video_object_key?: string | null
 		record_video?: number
 		last_sequence?: number
 		started_at?: string | null

@@ -28,7 +28,8 @@ describe('Share URL & Web Viewer use cases', () => {
 		result: 'PASS',
 		actual_result: 'Login berhasil ke dashboard',
 		share_token: null,
-		video_url: 'http://127.0.0.1:9000/qa-recording-artifacts/video.webm',
+		video_url: 'http://127.0.0.1:9000/qa-recording-artifacts/video.webm?X-Amz-Signature=expired',
+		video_object_key: 'sessions/1/video/abc.webm',
 		record_video: 1,
 		created_at: '2026-09-25 10:00:00'
 	};
@@ -179,14 +180,17 @@ describe('Share URL & Web Viewer use cases', () => {
 			expect(html).toContain('Login User Valid');
 			expect(html).toContain('id="ai-debug-payload"');
 			expect(html).toContain('Salin Konteks untuk AI Agent');
-			expect(html).toContain('video src=');
+			expect(html).toMatch(/<video src="[^"]*\/qa-recording-artifacts\/sessions\/1\/video\/abc\.webm"/);
+			expect(html).not.toContain('/share/token-abc/video');
+			expect(html).not.toContain('X-Amz-Signature');
 		});
 
 		it('merender placeholder kosong saat video_url bernilai null dan tidak ada error network/console', async () => {
 			(queries.findSessionByShareToken as jest.Mock).mockResolvedValue({
 				...mockSession,
 				share_token: 'token-empty',
-				video_url: null
+				video_url: null,
+				video_object_key: null
 			});
 			(queries.listCheckpointsBySession as jest.Mock).mockResolvedValue([]);
 			(eventQueries.listEventsBySession as jest.Mock).mockResolvedValue([]);
