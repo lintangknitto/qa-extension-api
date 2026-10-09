@@ -296,6 +296,26 @@ describe('Video multi-tab & riwayat re-run (test-matrix PB-1..PB-5)', () => {
 	});
 
 	// ------------------------------------------------------------ PB-3 halaman share
+	it('TC2-3: klik ganda "simpan run" (2 POST /runs paralel tanpa x-request-id, seperti extension) → hanya 1 run dibuat', async () => {
+		const idSession = await createSession('Klik ganda run', 'TC-DOUBLE-RUN');
+		await endSession(idSession);
+		const before = (await api('GET', `/sessions/${idSession}/runs`)).result.length;
+
+		const post = () =>
+			fetch(`${backend.baseUrl}/sessions/${idSession}/runs`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+				body: JSON.stringify({ result: 'PASS', actual_result: 'retest' })
+			}).then(async (r) => ({ status: r.status, body: await r.json() }));
+		const [a, b] = await Promise.all([post(), post()]);
+
+		expect(a.status).toBeLessThan(300);
+		expect(b.status).toBeLessThan(300);
+		// Dedupe bawaan knitto-http: kedua klik menerima run yang sama.
+		expect(a.body.result.run_number).toBe(b.body.result.run_number);
+		expect((await api('GET', `/sessions/${idSession}/runs`)).result.length).toBe(before + 1);
+	});
+
 	it('TC3-1: halaman share menampilkan tab run, video tiap run bisa diputar, Download bernama sesuai format', async () => {
 		const share = await api('POST', `/sessions/${multiTabSessionId}/share`);
 		expect(share.status).toBe(200);
