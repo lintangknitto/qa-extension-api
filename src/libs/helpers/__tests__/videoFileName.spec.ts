@@ -38,4 +38,10 @@ describe('buildVideoFileName', () => {
 		expect(buildVideoFileName({ testCaseNo: 'TC-2', title: 'a\uD83Db', startedAt: '2026-10-09T00:00:00Z', runNumber: 1 }))
 			.toBe('TC-2 - a b - 2026-10-09 07.00 - Run 1.webm');
 	});
+
+	it('pemotongan dari depan tidak menyisakan titik di awal nama', () => {
+		const name = buildVideoFileName({ testCaseNo: 'TC ' + '.'.repeat(200), title: 'Judul', startedAt: '2026-10-09T00:00:00Z', runNumber: 1 });
+		// TC saja sudah melebihi batas: judul dibuang, sisa titik + pemisah di depan ikut dibuang.
+		expect(name).toBe('2026-10-09 07.00 - Run 1.webm');
+	});
 });

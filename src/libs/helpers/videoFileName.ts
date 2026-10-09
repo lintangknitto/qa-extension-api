@@ -56,7 +56,7 @@ export const buildVideoFileName = (input: {
 
 	const name = [head, title, tail].filter(Boolean).join(' - ');
 	if (name.length <= VIDEO_FILE_NAME_MAX_LENGTH) return name;
-	// Nomor TC sangat panjang: pertahankan ekor (waktu + run), buang spasi/pemisah di depan
+	// Nomor TC sangat panjang: pertahankan ekor (waktu + run), buang spasi/titik/pemisah di depan
 	// supaya nama lolos validasi key (`name.trim() === name`).
-	return takeEnd(name, VIDEO_FILE_NAME_MAX_LENGTH).replace(/^[\s-]+/, '');
+	return takeEnd(name, VIDEO_FILE_NAME_MAX_LENGTH).replace(/^[\s.-]+/, '');
 };
