@@ -1,5 +1,8 @@
 /* eslint-disable complexity, @typescript-eslint/no-base-to-string */
 import { getShareContextUseCase } from './get-share-context.use-case';
+import { escapeHtml } from '@/libs/helpers/escapeHtml';
+import { buildVideoFileName } from '@/libs/helpers/videoFileName';
+import { renderRunsSection, renderTabSwitches, RUNS_SCRIPT } from './render-share-runs';
 
 export const renderShareHtml = async (shareToken: string, hostUrl?: string): Promise<string> => {
 	const data = await getShareContextUseCase(shareToken);
@@ -7,8 +10,21 @@ export const renderShareHtml = async (shareToken: string, hostUrl?: string): Pro
 	const safeJson = JSON.stringify(data).replace(/</g, '\\u003c');
 	const baseUrl = hostUrl || 'http://127.0.0.1:8010';
 	const aiContextEndpoint = `${baseUrl}/api/v1/sessions/share/${shareToken}/ai-context`;
-	// Video langsung dari MinIO (bucket public, tanpa signature); dihitung dari `video_object_key`.
-	const videoSrc = s.video_url ? String(s.video_url) : '';
+	// Video langsung dari MinIO (bucket public, tanpa signature); sesi tanpa riwayat run tampil sebagai Run #1.
+	const runsHtml = renderRunsSection(data.runs, {
+		run_number: 1,
+		kind: 'original',
+		result: s.result ? String(s.result) : null,
+		actual_result: s.actual_result ? String(s.actual_result) : null,
+		video_url: s.video_url ? String(s.video_url) : null,
+		video_file_name: buildVideoFileName({
+			testCaseNo: s.test_case_no ? String(s.test_case_no) : null,
+			title: s.title ? String(s.title) : null,
+			startedAt: String(s.started_at || s.created_at || new Date().toISOString()),
+			runNumber: 1
+		})
+	});
+	const tabSwitchesHtml = renderTabSwitches(data.tab_switches);
 
 	const statusColor =
 		s.result === 'PASS'
@@ -69,6 +85,13 @@ ${
 	data.checkpoints.length === 0
 		? '_No manual checkpoints recorded._'
 		: data.checkpoints.map((cp, idx) => `${idx + 1}. ${cp.note}`).join('\n')
+}
+
+## 3b. Tab Switches (${data.tab_switches.length})
+${
+	data.tab_switches.length === 0
+		? '_No tab switches recorded._'
+		: data.tab_switches.map((t) => `- #${t.sequence}: ${t.title || '-'} (${t.url || '-'})`).join('\n')
 }
 
 ## 4. Playwright Reproduction Script
@@ -601,26 +624,8 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F3574" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect width="14" height="14" x="1" y="5" rx="2" ry="2"/></svg>
 							<span>Rekaman Video Pengujian</span>
 						</h2>
-						${
-	s.video_url
-		? `<a href="${escapeHtml(videoSrc)}" target="_blank" rel="noreferrer" style="font-size: 11px; color: var(--primary); font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 4px;">
-									<span>Buka Tab Baru</span>
-									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
-								   </a>`
-		: ''
-}
 					</div>
-					${
-	s.video_url
-		? `<div class="video-box">
-								<video src="${escapeHtml(videoSrc)}" controls preload="metadata"></video>
-							   </div>`
-		: `<div class="video-empty">
-								<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" x2="23" y1="1" y2="23"/><path d="M21 15.554v-.004a2 2 0 0 0-.57-1.428L16 10l-4.5 4.5"/><path d="M16 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.414A2 2 0 0 1 3.586 6L7 2.586A2 2 0 0 1 8.414 2H14a2 2 0 0 1 2 2v2"/></svg>
-								<span style="font-weight:600; color:#334155;">Tidak ada video terunggah untuk sesi ini.</span>
-								<span style="font-size:11px;">Sesi ini tidak merekam video atau video belum selesai diunggah.</span>
-							   </div>`
-}
+					${runsHtml}
 				</section>
 
 				<section class="card">
@@ -649,6 +654,13 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 							   </ol>`
 }
 				</section>
+				${tabSwitchesHtml ? `<section class="card">
+					<div class="card-header">
+						<h2 class="card-title"><span>Perpindahan Tab</span></h2>
+						<span style="font-size: 11px; font-weight: 700; color: var(--text-muted); background: #f1f5f9; padding: 2px 8px; border-radius: 10px;">${data.tab_switches.length} Event</span>
+					</div>
+					${tabSwitchesHtml}
+				</section>` : ''}
 			</div>
 
 			<!-- Right Column: Tabs (Network, Console, Script) -->
@@ -861,6 +873,8 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 			});
 		}
 
+		${RUNS_SCRIPT}
+
 		function toggleReq(index) {
 			const box = document.getElementById('req-detail-' + index);
 			if (box) box.classList.toggle('open');
@@ -889,13 +903,3 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 </body>
 </html>`;
 };
-
-function escapeHtml(str: unknown): string {
-	const val = typeof str === 'string' ? str : (str === null || str === undefined ? '' : String(str));
-	return val
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;');
-}

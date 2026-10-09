@@ -1,6 +1,7 @@
 import { PROJECT_ADMIN_LEVELS, recordingConfig } from '@/libs/config';
 import { buildPublicObjectUrl } from '@/libs/config/minioClient';
 import {
+	allowedContentTypesForKind,
 	assertAllowedContentType,
 	assertSizeAllowed,
 	assertSupportedArtifactKind,
@@ -16,14 +17,14 @@ export const presignArtifactUploadUseCase = async (ctx: {
 	idSession: number;
 	userId: number;
 	userLevel: string | undefined;
-	input: { kind: string; content_type: string; size_bytes: number; sequence?: number };
+	input: { kind: string; content_type: string; size_bytes: number; sequence?: number; file_name?: string };
 }) => {
 	const session = sessionDomain.assertSessionExists(await sessionQueries.findSessionById(ctx.idSession));
 	sessionDomain.assertCanAccessSession(session, ctx.userId, ctx.userLevel, PROJECT_ADMIN_LEVELS);
-	sessionDomain.assertSessionIsRecording(session);
-
 	const kind = assertSupportedArtifactKind(ctx.input.kind);
-	assertAllowedContentType(ctx.input.content_type, recordingConfig.ARTIFACT_CONTENT_TYPES);
+	// File test data pengganti diunggah setelah sesi selesai (modal Re-run).
+	if (kind !== 'test_data_file') sessionDomain.assertSessionIsRecording(session);
+	assertAllowedContentType(ctx.input.content_type, allowedContentTypesForKind(kind, recordingConfig.ARTIFACT_CONTENT_TYPES));
 	assertSizeAllowed(ctx.input.size_bytes, recordingConfig.UPLOAD_MAX_BYTES);
 
 	const objectKey = buildArtifactObjectKey({
@@ -38,7 +39,8 @@ export const presignArtifactUploadUseCase = async (ctx: {
 		objectKey,
 		contentType: ctx.input.content_type,
 		sizeBytes: ctx.input.size_bytes,
-		sequence: ctx.input.sequence ?? null
+		sequence: ctx.input.sequence ?? null,
+		fileName: ctx.input.file_name ?? null
 	});
 
 	// Bucket public read+write: URL upload tanpa signature (tidak kedaluwarsa).

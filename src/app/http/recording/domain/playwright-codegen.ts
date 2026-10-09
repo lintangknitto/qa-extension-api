@@ -48,7 +48,7 @@ export interface CodegenStep {
 	secretEnv?: string;
 	/** Locator tujuan untuk `dragTo` (tanpa prefix `page.`). */
 	targetLocator?: string;
-	/** Nama file untuk `setInputFiles` (file asli tidak terekam). */
+	/** Nama file untuk `setInputFiles` (isi file tersimpan sebagai artifact `test_data_file` bila memungkinkan). */
 	files?: string[];
 	ambiguous: boolean;
 	/** Sequence event sumber (untuk korelasi dengan rekaman). */
@@ -65,7 +65,12 @@ export interface CodegenInput {
 	session: { test_case_no?: string | null; title?: string | null; target_url?: string | null };
 	events: IAiInputEvent[];
 	checkpoints: IAiInputCheckpoint[];
+	/** File test data tersimpan (artifact `test_data_file`) untuk komentar sumber langkah upload. */
+	testDataFiles?: Array<{ file_name: string; id_artifact: number }>;
 }
+
+/** Folder file uji relatif terhadap spec yang diunduh. */
+export const TEST_DATA_DIR = 'test-data';
 
 interface NormalizedAction {
 	kind: 'navigation' | 'click' | 'dblclick' | 'rightclick' | 'hover' | 'drag' | 'upload' | 'input' | 'change' | 'keydown';
@@ -430,7 +435,7 @@ const STEP_RENDERERS: Record<CodegenAction, (step: CodegenStep, target: string) 
 	rightclick: (_step, target) => `await ${target}.click({ button: 'right' });`,
 	hover: (_step, target) => `await ${target}.hover();`,
 	dragTo: (step, target) => `await ${target}.dragTo(page.${step.targetLocator ?? ''});`,
-	setInputFiles: (step, target) => `await ${target}.setInputFiles([${(step.files ?? []).map((name) => quoteJs(`fixtures/${name}`)).join(', ')}]);`
+	setInputFiles: (step, target) => `await ${target}.setInputFiles([${(step.files ?? []).map((name) => quoteJs(`${TEST_DATA_DIR}/${name}`)).join(', ')}]);`
 };
 
 export const renderStep = (step: CodegenStep): string => STEP_RENDERERS[step.action](step, `page.${step.locator}`);
@@ -453,7 +458,6 @@ export const renderScript = (
 	for (const step of steps) {
 		if (step.ambiguous) lines.push(commentLine('⚠ locator tidak unik saat direkam'));
 		lines.push(`\t${renderStep(step)}`);
-		if (step.action === 'setInputFiles' && step.files?.length) lines.push(commentLine(`sediakan file uji di fixtures/: ${step.files.join(', ')}`));
 		for (const comment of step.comments) lines.push(commentLine(comment));
 	}
 	for (const comment of trailingComments) lines.push(commentLine(comment));
@@ -482,6 +486,22 @@ const prependStartUrl = (steps: CodegenStep[], actions: NormalizedAction[], targ
 	return null;
 };
 
+/** Komentar sumber tiap file langkah upload: artifact rekaman, atau perlu disediakan manual. */
+const attachTestDataSources = (steps: CodegenStep[], files: Array<{ file_name: string; id_artifact: number }>): void => {
+	const byName = new Map(files.map((file) => [file.file_name, file]));
+	for (const step of steps) {
+		if (step.action !== 'setInputFiles') continue;
+		for (const name of step.files ?? []) {
+			const source = byName.get(name);
+			step.comments.push(
+				source
+					? `${TEST_DATA_DIR}/${name}: file rekaman (artifact #${source.id_artifact}, GET /sessions/:id/test-data-files)`
+					: `${TEST_DATA_DIR}/${name}: file tidak tersimpan saat rekam, sediakan manual`
+			);
+		}
+	}
+};
+
 export const generatePlaywrightScript = (input: CodegenInput): CodegenResult => {
 	const actions = input.events
 		.filter((event) => event.type === 'action' || event.type === 'navigation')
@@ -492,6 +512,7 @@ export const generatePlaywrightScript = (input: CodegenInput): CodegenResult => 
 
 	const steps = buildSteps(actions);
 	const warning = steps[0]?.action !== 'goto' ? prependStartUrl(steps, actions, input.session.target_url) : null;
+	attachTestDataSources(steps, input.testDataFiles ?? []);
 	const trailing = attachCheckpoints(steps, input.checkpoints);
 	return { script: renderScript(input.session, steps, trailing, warning ? [warning] : []), steps };
 };

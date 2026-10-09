@@ -14,6 +14,8 @@ import { loadSessionEvents } from './load-session-events';
 import { startInvestigationInBackground, type BackgroundRunner } from './investigate-session.use-case';
 import { collectFailureSignals, shouldAutoInvestigate } from '../domain/investigation-context';
 import { generatePlaywrightScript, CODEGEN_MODEL, CODEGEN_VERSION } from '../domain/playwright-codegen';
+import { listTestDataFiles } from './test-data-files.use-case';
+import * as artifactQueries from '../queries/artifact.queries';
 import { buildPatchUserPrompt, parsePatchResponse, renderPatchedScript, validatePatches } from '../domain/ai-patch';
 import * as generationQueries from '../queries/generation.queries';
 import * as generationRepo from '../repo/generation.repo';
@@ -58,7 +60,8 @@ export const generateSessionOutputsUseCase = async (ctx: {
 	};
 
 	const context = buildAiSessionContext({ session: sessionInfo, events, checkpoints });
-	const codegen = generatePlaywrightScript({ session: sessionInfo, events: actionEvents, checkpoints });
+	const testDataFiles = listTestDataFiles(await artifactQueries.listArtifactsBySession(ctx.idSession));
+	const codegen = generatePlaywrightScript({ session: sessionInfo, events: actionEvents, checkpoints, testDataFiles });
 
 	const runKind = async (kind: TGenerationKind, completer: IAiCompleter): Promise<string> => {
 		if (kind === 'playwright') return codegen.script;

@@ -206,9 +206,25 @@ describe('playwright-codegen aksi lanjutan', () => {
 		expect(script).toContain("\tawait page.getByText('Baris 1', { exact: true }).dblclick();");
 		expect(script).toContain("\tawait page.getByRole('row', { name: 'Baris 2', exact: true }).click({ button: 'right' });");
 		expect(script).toContain("\tawait page.getByTestId('card-1').dragTo(page.getByTestId('kolom-selesai'));");
-		expect(script).toContain("\tawait page.getByLabel('Lampiran', { exact: true }).setInputFiles(['fixtures/invoice 1.pdf']);");
-		expect(script).toContain("\t// sediakan file uji di fixtures/: invoice 1.pdf");
+		expect(script).toContain("\tawait page.getByLabel('Lampiran', { exact: true }).setInputFiles(['test-data/invoice 1.pdf']);");
+		expect(script).toContain('\t// test-data/invoice 1.pdf: file tidak tersimpan saat rekam, sediakan manual');
 		expect(script).toContain("\tawait page.getByTitle('Live Chat', { exact: true }).contentFrame().getByRole('button', { name: 'Kirim', exact: true }).click();");
+	});
+
+	it('setInputFiles memakai test-data/ dengan komentar sumber artifact file rekaman', () => {
+		const { events, add } = make();
+		add({ action: 'navigation', url: 'https://app.example.test/form' });
+		add({ action: 'upload', unique_locator: "getByLabel('Lampiran', { exact: true })", files: ['invoice.pdf', 'besar.zip'] });
+
+		const { script } = generatePlaywrightScript({
+			session,
+			events,
+			checkpoints: [],
+			testDataFiles: [{ file_name: 'invoice.pdf', id_artifact: 31 }]
+		});
+		expect(script).toContain("setInputFiles(['test-data/invoice.pdf', 'test-data/besar.zip']);");
+		expect(script).toContain('\t// test-data/invoice.pdf: file rekaman (artifact #31, GET /sessions/:id/test-data-files)');
+		expect(script).toContain('\t// test-data/besar.zip: file tidak tersimpan saat rekam, sediakan manual');
 	});
 
 	it('dblclick tanpa klik sebelumnya tetap satu langkah dblclick', () => {

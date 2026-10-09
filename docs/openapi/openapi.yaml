@@ -945,7 +945,7 @@ paths:
     post:
       tags: [sessions]
       summary: Buat URL upload video
-      description: URL upload publik tanpa signature (bucket MinIO public read+write). Field `expires_in` deprecated (URL tidak kedaluwarsa). Object key `sessions/<id_session>/video/<uuid>.webm`.
+      description: URL upload publik tanpa signature (bucket MinIO public read+write). Field `expires_in` deprecated (URL tidak kedaluwarsa). Object key `sessions/<id_session>/video/<uuid>/<nama file>` (nama file Run #1); key lama `<uuid>.webm` tetap diterima di complete.
       operationId: postSessionVideoPresign
       parameters:
         - $ref: '#/components/parameters/SessionId'
@@ -1037,6 +1037,83 @@ paths:
       responses:
         '200':
           description: URL video
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/runs:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [sessions]
+      summary: Daftar run sesi
+      description: Run #1 = rekaman asli, Run #2+ = re-run. Item berbentuk `SessionRun`. Alias `/api/v1/sessions/{id_session}/runs`.
+      operationId: listSessionRuns
+      responses:
+        '200':
+          description: Daftar run
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, result]
+                properties:
+                  message: { type: string, example: Success }
+                  result:
+                    type: array
+                    items: { $ref: '#/components/schemas/SessionRun' }
+    post:
+      tags: [sessions]
+      summary: Simpan re-run
+      description: Membuat run dengan nomor berikutnya. Hasil run ini menjadi hasil sesi dan status test case. Sesi harus sudah selesai.
+      operationId: createSessionRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRunRequest' }
+      responses:
+        '201':
+          description: Run tersimpan (`SessionRun`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/runs/{run_number}/video/presign-upload:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/RunNumber'
+    post:
+      tags: [sessions]
+      summary: Buat URL upload video run
+      description: Object key `sessions/<id_session>/video/<uuid>/<nama file>`. Tidak mengubah video sesi.
+      operationId: postSessionRunVideoPresign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PresignVideoRequest' }
+      responses:
+        '201':
+          description: URL upload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/runs/{run_number}/video/complete:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+      - $ref: '#/components/parameters/RunNumber'
+    post:
+      tags: [sessions]
+      summary: Selesaikan upload video run
+      description: Ukuran diverifikasi dari objek di storage (maks. 100MB).
+      operationId: postSessionRunVideoComplete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteVideoRequest' }
+      responses:
+        '200':
+          description: Video run tersimpan (`SessionRun`)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
@@ -1167,6 +1244,43 @@ paths:
       responses:
         '200':
           description: Presigned download URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /sessions/{id_session}/test-data-files:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [artifacts]
+      summary: Daftar file test data untuk replay
+      description: Satu item per nama file (artifact `test_data_file` terbaru menang). Replay mencocokkan langkah `setInputFiles` berdasarkan `file_name`.
+      operationId: listTestDataFiles
+      responses:
+        '200':
+          description: Daftar file test data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, result]
+                properties:
+                  message: { type: string, example: Success }
+                  result:
+                    type: array
+                    items: { $ref: '#/components/schemas/TestDataFile' }
+    put:
+      tags: [artifacts]
+      summary: Kaitkan file pengganti ke langkah upload
+      description: Artifact harus milik sesi, kind `test_data_file`, dan sudah terunggah. `file_name` = nama file yang diharapkan langkah upload.
+      operationId: linkTestDataFiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LinkTestDataFilesRequest' }
+      responses:
+        '200':
+          description: Daftar file test data setelah dikaitkan
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
@@ -1378,6 +1492,11 @@ components:
       schema: { type: integer, minimum: 1 }
     SessionId:
       name: id_session
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    RunNumber:
+      name: run_number
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
@@ -1663,14 +1782,67 @@ components:
       required: [object_key]
       properties:
         object_key: { type: string, minLength: 1 }
+    CreateRunRequest:
+      type: object
+      required: [result]
+      properties:
+        result: { type: string, enum: [PASS, FAIL, BLOCKED] }
+        actual_result: { type: string, maxLength: 5000, nullable: true }
+        executed_steps: { type: integer, minimum: 0, nullable: true }
+        error: { type: string, maxLength: 5000, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        ended_at: { type: string, format: date-time, nullable: true }
+    SessionRun:
+      type: object
+      description: Juga muncul sebagai field `runs` di detail sesi dan konteks share.
+      properties:
+        id_run: { type: integer }
+        id_session: { type: integer }
+        run_number: { type: integer, minimum: 1 }
+        kind: { type: string, enum: [original, rerun] }
+        result: { type: string, enum: [PASS, FAIL, BLOCKED], nullable: true }
+        actual_result: { type: string, nullable: true }
+        executed_steps: { type: integer, nullable: true }
+        error: { type: string, nullable: true }
+        video_url: { type: string, nullable: true }
+        video_file_name: { type: string, description: 'Format `<TC> - <judul> - <YYYY-MM-DD HH.mm> - Run <n>.webm` (WIB).' }
+        started_at: { type: string, format: date-time, nullable: true }
+        ended_at: { type: string, format: date-time, nullable: true }
+        created_by_user_id: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
     PresignArtifactRequest:
       type: object
       required: [kind, content_type, size_bytes]
       properties:
-        kind: { type: string, enum: [screenshot, network_body, console, dom, video, storage_state, other] }
+        kind: { type: string, enum: [screenshot, network_body, console, dom, video, storage_state, test_data_file, other] }
         content_type: { type: string, maxLength: 150 }
         size_bytes: { type: integer, minimum: 1 }
         sequence: { type: integer, minimum: 0 }
+        file_name: { type: string, minLength: 1, maxLength: 255, description: 'Nama file asli (kind test_data_file).' }
+    TestDataFile:
+      type: object
+      properties:
+        id_artifact: { type: integer }
+        file_name: { type: string }
+        content_type: { type: string, nullable: true }
+        size_bytes: { type: integer }
+        sequence: { type: integer, nullable: true }
+        download_url: { type: string }
+    LinkTestDataFilesRequest:
+      type: object
+      required: [files]
+      properties:
+        files:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required: [id_artifact, file_name]
+            properties:
+              id_artifact: { type: integer, minimum: 1 }
+              file_name: { type: string, minLength: 1, maxLength: 255 }
+              sequence: { type: integer, minimum: 0 }
     CompleteArtifactRequest:
       type: object
       properties:

@@ -3,6 +3,7 @@ import type { TEndSessionValidation } from '../session.request';
 import * as domain from '../domain/session.domain';
 import * as queries from '../queries/session.queries';
 import * as repo from '../repo/session.repo';
+import * as runRepo from '../repo/session-run.repo';
 
 import * as tcRepo from '../../test-case/repo/test-case.repo';
 
@@ -18,15 +19,12 @@ export const endSessionUseCase = async (ctx: {
 
 	const result = domain.assertValidSessionResult(ctx.input.result);
 	await repo.completeSession(ctx.idSession, result, ctx.input.actual_result ?? null);
+	await runRepo.upsertOriginalRun(ctx.idSession, ctx.userId);
 
 	if (session.id_test_case) {
-		let testCaseStatus = 'Passed';
-		if (result === 'FAIL') testCaseStatus = 'Failed';
-		else if (result === 'BLOCKED') testCaseStatus = 'Re-Test';
-
 		await tcRepo.updateTestCaseStatusAndEvidence(
 			Number(session.id_test_case),
-			testCaseStatus,
+			domain.testCaseStatusForResult(result),
 			ctx.input.actual_result ?? null,
 			ctx.idSession
 		);

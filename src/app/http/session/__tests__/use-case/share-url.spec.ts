@@ -2,13 +2,17 @@ import { NotFoundException, NotAuthorizationException } from '@knittotextile/kni
 import { createShareUrlUseCase } from '../../use-case/create-share-url.use-case';
 import { getShareContextUseCase } from '../../use-case/get-share-context.use-case';
 import { renderShareHtml } from '../../use-case/render-share-page';
+import { renderRunsSection, renderTabSwitches, RUNS_SCRIPT, type IShareRun } from '../../use-case/render-share-runs';
 import * as queries from '../../queries/session.queries';
 import * as repo from '../../repo/session.repo';
+import * as runRepo from '../../repo/session-run.repo';
 import * as eventQueries from '../../../recording/queries/recording-event.queries';
 import * as genQueries from '../../../recording/queries/generation.queries';
 
 jest.mock('../../queries/session.queries');
 jest.mock('../../repo/session.repo');
+jest.mock('../../repo/session-run.repo');
+
 jest.mock('../../../recording/queries/recording-event.queries');
 jest.mock('../../../recording/queries/generation.queries');
 jest.mock('../../../project/queries/project.queries', () => ({
@@ -36,6 +40,7 @@ describe('Share URL & Web Viewer use cases', () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		(runRepo.listRunsBySession as jest.Mock).mockResolvedValue([]);
 	});
 
 	describe('createShareUrlUseCase', () => {
@@ -141,11 +146,23 @@ describe('Share URL & Web Viewer use cases', () => {
 						level: 'error',
 						text: 'Unhandled exception in auth.js'
 					})
+				},
+				{
+					id_event: 3,
+					id_session: 1,
+					sequence: 3,
+					event_type: 'tab',
+					payload: JSON.stringify({ kind: 'switch', from_tab_id: 1, to_tab_id: 2, title: 'Bayar', url: 'https://pay.example.com' })
 				}
 			]);
 			(genQueries.listGenerations as jest.Mock).mockResolvedValue([
 				{ id_generation: 1, kind: 'playwright', output: 'test("login", async () => {})' }
 			]);
+
+			(runRepo.listRunsBySession as jest.Mock).mockResolvedValueOnce([
+		{ id_run: 1, id_session: 1, run_number: 1, kind: 'original', result: 'PASS', started_at: '2026-10-09T03:05:00Z', video_object_key: 'sessions/1/video/0f8fad5b-d9cb-469f-a165-70867728950e.webm' },
+		{ id_run: 2, id_session: 1, run_number: 2, kind: 'rerun', result: 'FAIL', started_at: '2026-10-09T04:00:00Z', video_object_key: 'sessions/1/video/0f8fad5b-d9cb-469f-a165-70867728950e/TC-AUTH-01 - Login - 2026-10-09 11.00 - Run 2.webm' }
+	]);
 
 			const result = await getShareContextUseCase('valid-token');
 
@@ -156,6 +173,65 @@ describe('Share URL & Web Viewer use cases', () => {
 			expect(result.console_logs).toHaveLength(1);
 			expect(result.playwright_script).toContain('test("login"');
 			expect(result.counts.total_failed_requests).toBe(1);
+			expect(result.network_requests).toHaveLength(1);
+			expect(result.tab_switches).toEqual([
+				expect.objectContaining({ sequence: 3, from_tab_id: 1, to_tab_id: 2, title: 'Bayar', url: 'https://pay.example.com' })
+			]);
+			expect(result.runs.map((run) => [run.run_number, run.video_file_name])).toEqual([
+				[1, 'TC-AUTH-01 - Login User Valid - 2026-10-09 10.05 - Run 1.webm'],
+				[2, 'TC-AUTH-01 - Login - 2026-10-09 11.00 - Run 2.webm']
+			]);
+		});
+	});
+
+	describe('renderRunsSection', () => {
+		const run = (n: number, extra: Partial<IShareRun> = {}): IShareRun => ({
+			run_number: n,
+			kind: n === 1 ? 'original' : 'rerun',
+			result: 'PASS',
+			actual_result: null,
+			video_url: `http://minio/b/v${n}.webm`,
+			video_file_name: `TC - Run ${n}.webm`,
+			...extra
+		});
+
+		it('merender tab per run dengan Run #1 sebagai default dan Download bernama per run', () => {
+			const html = renderRunsSection([run(1), run(2, { result: 'FAIL' })], run(1));
+			expect(html).toContain('id="run-tab-1" aria-controls="run-panel-1" aria-selected="true"');
+			expect(html).toContain('id="run-tab-2" aria-controls="run-panel-2" aria-selected="false"');
+			expect(html).toContain('Run #1 (Asli)');
+			expect(html).toMatch(/id="run-panel-2" aria-hidden="true" hidden/);
+			expect(html).toContain('download="TC - Run 2.webm" data-file-name="TC - Run 2.webm" onclick="return downloadRunVideo(event, this)"');
+			expect(html).toContain('FAILED');
+		});
+
+		it('meng-escape nilai run', () => {
+			const html = renderRunsSection([run(1, { actual_result: '<img src=x onerror=alert(1)>', video_file_name: '"><script>.webm' })], run(1));
+			expect(html).not.toContain('<img src=x');
+			expect(html).not.toContain('"><script>');
+			expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+		});
+
+		it('memakai fallback sebagai Run #1 tanpa tab bila riwayat kosong', () => {
+			const html = renderRunsSection([], run(1, { video_url: null }));
+			expect(html).not.toContain('role="tablist"');
+			expect(html).toContain('Tidak ada video terunggah untuk run ini.');
+		});
+
+		it('script Download memakai blob dengan fallback link langsung', () => {
+			expect(RUNS_SCRIPT).toContain('res.blob()');
+			expect(RUNS_SCRIPT).toContain('a.download = name');
+			expect(RUNS_SCRIPT).toContain("window.open(href, '_blank', 'noopener')");
+		});
+
+		it('renderTabSwitches menampilkan judul atau host tab tujuan', () => {
+			const html = renderTabSwitches([
+				{ sequence: 4, title: 'Bayar', url: 'https://pay.example.com/x' },
+				{ sequence: 9, title: null, url: 'https://oauth.example.com/login' }
+			]);
+			expect(html).toContain('Pindah ke tab: Bayar <span style="color: var(--text-muted);">(pay.example.com)</span>');
+			expect(html).toContain('Pindah ke tab: oauth.example.com');
+			expect(renderTabSwitches([])).toBe('');
 		});
 	});
 
@@ -198,7 +274,7 @@ describe('Share URL & Web Viewer use cases', () => {
 
 			const html = await renderShareHtml('token-empty', 'http://127.0.0.1:8010');
 
-			expect(html).toContain('Tidak ada video terunggah untuk sesi ini.');
+			expect(html).toContain('Tidak ada video terunggah untuk run ini.');
 			expect(html).toContain('Tidak ada checkpoint yang dicatat.');
 			expect(html).toContain('_No HTTP 4xx/5xx requests detected._');
 			expect(html).toContain('_No console errors captured._');

@@ -2,6 +2,7 @@ import { InvalidParameterException } from '@knittotextile/knitto-core-backend/di
 import { PROJECT_ADMIN_LEVELS, recordingConfig } from '@/libs/config';
 import { statArtifactObject } from '@/libs/config/minioClient';
 import {
+	allowedContentTypesForKind,
 	assertArtifactBelongsToSession,
 	assertArtifactExists,
 	assertUploadedObjectAllowed,
@@ -36,7 +37,10 @@ export const completeArtifactUploadUseCase = async (ctx: {
 
 	assertUploadedObjectAllowed(
 		{ size: stat.size, contentType: stat.metaData?.['content-type'] ?? artifact.content_type },
-		{ maxBytes: recordingConfig.UPLOAD_MAX_BYTES, allowedContentTypes: recordingConfig.ARTIFACT_CONTENT_TYPES }
+		{
+			maxBytes: recordingConfig.UPLOAD_MAX_BYTES,
+			allowedContentTypes: allowedContentTypesForKind(String(artifact.kind), recordingConfig.ARTIFACT_CONTENT_TYPES)
+		}
 	);
 
 	await artifactRepo.markArtifactUploaded(ctx.idArtifact, {

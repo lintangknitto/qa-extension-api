@@ -6,6 +6,7 @@ import { listCheckpointsBySession } from '../queries/session.queries';
 import { listEventsBySession } from '../../recording/queries/recording-event.queries';
 import { listGenerations } from '../../recording/queries/generation.queries';
 import { findProjectById } from '../../project/queries/project.queries';
+import { listRunsBySession } from '../repo/session-run.repo';
 
 export interface INetworkRequestSummary {
 	sequence: number;
@@ -35,6 +36,15 @@ export interface IUserActionSummary {
 	timestamp?: string;
 }
 
+export interface ITabSwitchSummary {
+	sequence: number;
+	from_tab_id: number | null;
+	to_tab_id: number | null;
+	title: string | null;
+	url: string | null;
+	timestamp?: string;
+}
+
 export const getShareContextUseCase = async (shareToken: string) => {
 	const session = await sessionQueries.findSessionByShareToken(shareToken);
 	if (!session) {
@@ -44,17 +54,19 @@ export const getShareContextUseCase = async (shareToken: string) => {
 	const idSession = Number(session.id_session);
 
 	// Load related data concurrently
-	const [checkpoints, rawEvents, generations, project] = await Promise.all([
+	const [checkpoints, rawEvents, generations, project, runs] = await Promise.all([
 		listCheckpointsBySession(idSession),
 		listEventsBySession(idSession, 0, 1500),
 		listGenerations(idSession),
-		session.id_project ? findProjectById(Number(session.id_project)) : Promise.resolve(null)
+		session.id_project ? findProjectById(Number(session.id_project)) : Promise.resolve(null),
+		listRunsBySession(idSession)
 	]);
 
 	const networkRequests: INetworkRequestSummary[] = [];
 	const consoleLogs: IConsoleLogSummary[] = [];
 	const userActions: IUserActionSummary[] = [];
 	const failedRequests: INetworkRequestSummary[] = [];
+	const tabSwitches: ITabSwitchSummary[] = [];
 
 	for (const event of rawEvents) {
 		let payload: any = {};
@@ -68,6 +80,21 @@ export const getShareContextUseCase = async (shareToken: string) => {
 
 		const eventType = String(event.event_type || '').toLowerCase();
 		const seq = Number(event.sequence || 0);
+
+		// Event `tab` punya `url`: harus dicek sebelum heuristik network di bawah.
+		if (eventType === 'tab') {
+			if (payload?.kind === 'switch') {
+				tabSwitches.push({
+					sequence: seq,
+					from_tab_id: payload.from_tab_id ?? null,
+					to_tab_id: payload.to_tab_id ?? null,
+					title: payload.title || null,
+					url: payload.url || event.url || null,
+					timestamp: event.occurred_at || event.created_at
+				});
+			}
+			continue;
+		}
 
 		if (eventType.includes('network') || payload?.type === 'network' || payload?.url || payload?.status) {
 			const statusCode = Number(payload.status || payload.statusCode || 200);
@@ -122,12 +149,14 @@ export const getShareContextUseCase = async (shareToken: string) => {
 			project_code: project?.code || null
 		},
 		checkpoints: checkpoints.map(sessionDomain.toCheckpointResponse),
+		runs: runs.map((run) => sessionDomain.toRunResponse(session, run)),
 		playwright_script: playwrightGen?.output || null,
 		investigation_report: investigationGen?.output || null,
 		failed_requests: failedRequests,
 		network_requests: networkRequests,
 		console_logs: consoleLogs,
 		user_actions: userActions,
+		tab_switches: tabSwitches,
 		counts: {
 			total_events: rawEvents.length,
 			total_checkpoints: checkpoints.length,

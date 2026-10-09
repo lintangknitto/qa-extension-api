@@ -40,6 +40,18 @@ export const completeSession = async (
 	);
 };
 
+/** Hasil sesi mengikuti run terakhir (re-run). */
+export const updateSessionResult = async (
+	idSession: number,
+	result: string,
+	actualResult: string | null
+): Promise<void> => {
+	await postgresConnection.raw(
+		'UPDATE recording_sessions SET result = $1, actual_result = $2, updated_at = CURRENT_TIMESTAMP WHERE id_session = $3',
+		[result, actualResult, idSession]
+	);
+};
+
 export const discardActiveSessionsByOwner = async (ownerUserId: number): Promise<number> => {
 	const rows = await postgresConnection.raw<Array<{ id_session: number }>>(
 		`UPDATE recording_sessions

@@ -7,10 +7,11 @@ export const insertArtifact = async (fields: {
 	contentType: string;
 	sizeBytes: number;
 	sequence?: number | null;
+	fileName?: string | null;
 }): Promise<number> => {
 	const [row] = await postgresConnection.raw<Array<{ id_artifact: number | string }>>(
-		`INSERT INTO recording_artifacts (id_session, kind, object_key, content_type, size_bytes, sequence, status, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'pending', CURRENT_TIMESTAMP)
+		`INSERT INTO recording_artifacts (id_session, kind, object_key, content_type, size_bytes, sequence, file_name, status, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', CURRENT_TIMESTAMP)
 		 RETURNING id_artifact`,
 		[
 			fields.idSession,
@@ -18,10 +19,22 @@ export const insertArtifact = async (fields: {
 			fields.objectKey,
 			fields.contentType,
 			fields.sizeBytes,
-			fields.sequence ?? null
+			fields.sequence ?? null,
+			fields.fileName ?? null
 		]
 	);
 	return Number(row?.id_artifact);
+};
+
+/** File pengganti: nama file yang diharapkan langkah upload (dan sequence langkah bila diketahui). */
+export const linkTestDataFile = async (
+	idArtifact: number,
+	fields: { fileName: string; sequence: number | null }
+): Promise<void> => {
+	await postgresConnection.raw(
+		'UPDATE recording_artifacts SET file_name = $1, sequence = COALESCE($2, sequence) WHERE id_artifact = $3',
+		[fields.fileName, fields.sequence, idArtifact]
+	);
 };
 
 export const markArtifactUploaded = async (

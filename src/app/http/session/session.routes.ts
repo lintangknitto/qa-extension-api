@@ -91,6 +91,33 @@ router.get(
 	requestHandler(controller.getVideoUrl)
 );
 
+router.post(
+	['/sessions/:id_session/runs', '/api/v1/sessions/:id_session/runs'],
+	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
+	requestValidator({ requestType: 'body', type: request.createRunValidation }),
+	requestHandler(controller.createRun)
+);
+
+router.get(
+	['/sessions/:id_session/runs', '/api/v1/sessions/:id_session/runs'],
+	requestValidator({ requestType: 'params', type: request.sessionIdParamValidation }),
+	requestHandler(controller.listRuns)
+);
+
+router.post(
+	['/sessions/:id_session/runs/:run_number/video/presign-upload', '/api/v1/sessions/:id_session/runs/:run_number/video/presign-upload'],
+	requestValidator({ requestType: 'params', type: request.runNumberParamValidation }),
+	requestValidator({ requestType: 'body', type: request.presignVideoUploadValidation }),
+	requestHandler(controller.presignRunVideo)
+);
+
+router.post(
+	['/sessions/:id_session/runs/:run_number/video/complete', '/api/v1/sessions/:id_session/runs/:run_number/video/complete'],
+	requestValidator({ requestType: 'params', type: request.runNumberParamValidation }),
+	requestValidator({ requestType: 'body', type: request.completeVideoUploadValidation }),
+	requestHandler(controller.completeRunVideo)
+);
+
 router.get('/share/:share_token', async (req, res, next) => {
 	try {
 		const token = req.params.share_token;

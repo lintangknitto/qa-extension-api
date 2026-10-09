@@ -1,7 +1,9 @@
 import {
+	array,
 	InferOutput,
 	integer,
 	maxLength,
+	minLength,
 	minValue,
 	number,
 	object,
@@ -48,7 +50,10 @@ export const presignArtifactUploadValidation = object({
 		integer(ID_MSG),
 		minValue(1, ID_MSG)
 	),
-	sequence: optional(pipe(number(ERROR_VALIDATION_MSG.number('Sequence')), integer(ID_MSG), minValue(0, ID_MSG)))
+	sequence: optional(pipe(number(ERROR_VALIDATION_MSG.number('Sequence')), integer(ID_MSG), minValue(0, ID_MSG))),
+	file_name: optional(
+		pipe(string(ERROR_VALIDATION_MSG.string('Nama file')), minLength(1, ERROR_VALIDATION_MSG.minLength('Nama file', 1)), maxLength(255, ERROR_VALIDATION_MSG.maxLength('Nama file', 255)))
+	)
 });
 export type TPresignArtifactUploadValidation = InferOutput<typeof presignArtifactUploadValidation>;
 
@@ -63,7 +68,27 @@ export const completeArtifactUploadValidation = object({
 });
 export type TCompleteArtifactUploadValidation = InferOutput<typeof completeArtifactUploadValidation>;
 
+export const linkTestDataFilesValidation = object({
+	files: pipe(
+		array(
+			object({
+				id_artifact: pipe(number(ERROR_VALIDATION_MSG.number('ID artifact')), integer(ID_MSG), minValue(1, ID_MSG)),
+				file_name: pipe(
+					string(ERROR_VALIDATION_MSG.string('Nama file')),
+					minLength(1, ERROR_VALIDATION_MSG.minLength('Nama file', 1)),
+					maxLength(255, ERROR_VALIDATION_MSG.maxLength('Nama file', 255))
+				),
+				sequence: optional(pipe(number(ERROR_VALIDATION_MSG.number('Sequence')), integer(ID_MSG), minValue(0, ID_MSG)))
+			})
+		),
+		minLength(1, 'Minimal satu file test data.'),
+		maxLength(50, 'Maksimal 50 file test data per permintaan.')
+	)
+});
+export type TLinkTestDataFilesValidation = InferOutput<typeof linkTestDataFilesValidation>;
+
 export default {
+	linkTestDataFilesValidation,
 	sessionParamValidation,
 	sessionArtifactParamValidation,
 	presignArtifactUploadValidation,
