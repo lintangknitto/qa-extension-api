@@ -1,6 +1,6 @@
 import { InvalidParameterException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 import { PROJECT_ADMIN_LEVELS, recordingConfig } from '@/libs/config';
-import { createPresignedGetUrl } from '@/libs/config/minioClient';
+import { buildPublicObjectUrl } from '@/libs/config/minioClient';
 import {
 	ARTIFACT_STATUS,
 	assertArtifactBelongsToSession,
@@ -25,10 +25,6 @@ export const getArtifactDownloadUrlUseCase = async (ctx: {
 	if (artifact.status !== ARTIFACT_STATUS.UPLOADED)
 		throw new InvalidParameterException('Artifact belum selesai diupload.');
 
-	const downloadUrl = await createPresignedGetUrl(
-		artifact.object_key,
-		recordingConfig.PRESIGN_EXPIRY_SECONDS
-	);
-
-	return { download_url: downloadUrl, expires_in: recordingConfig.PRESIGN_EXPIRY_SECONDS };
+	// Bucket public: URL langsung tanpa signature. `expires_in` dipertahankan demi kompatibilitas response.
+	return { download_url: buildPublicObjectUrl(artifact.object_key), expires_in: recordingConfig.PRESIGN_EXPIRY_SECONDS };
 };

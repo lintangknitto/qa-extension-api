@@ -11,7 +11,7 @@ export interface IBackendService {
 
 export const startBackendService = async (
 	endpoints: IDisposableStackEndpoints,
-	options: { port?: number; customAppSecret?: string } = {}
+	options: { port?: number; customAppSecret?: string; extraEnv?: NodeJS.ProcessEnv } = {}
 ): Promise<IBackendService> => {
 	// Pilih port dinamis jika tidak ditentukan
 	const port = options.port || (await getRandomPort());
@@ -35,10 +35,12 @@ export const startBackendService = async (
 		MINIO_SECRET_KEY: endpoints.minio.secretKey,
 		MINIO_BUCKET: endpoints.minio.bucket,
 		MINIO_USE_SSL: 'false',
+		MINIO_PUBLIC_BASE_URL: `http://${endpoints.minio.host}:${endpoints.minio.port}`,
 		OPENAI_BASE_URL: endpoints.mockAi.baseUrl,
 		OPENAI_API_KEY: 'e2e-fake-mock-key',
 		OPENAI_MODEL: 'mock-gpt-4o',
-		PROJECT_ADMIN_LEVELS: 'ADMIN,QA,SUPERADMIN'
+		PROJECT_ADMIN_LEVELS: 'ADMIN,QA,SUPERADMIN',
+		...options.extraEnv
 	};
 
 	// Run node itself with the tsx loader: one process, no pnpm/shell wrapper whose kill() would leave the

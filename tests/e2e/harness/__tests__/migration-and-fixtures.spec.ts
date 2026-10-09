@@ -38,6 +38,7 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 		const firstRunOutput = execSync(`pnpm exec tsx "${migrateScriptPath}"`, { env, encoding: 'utf-8' });
 		expect(firstRunOutput).toContain('Applying 001_init_schema.sql');
 		expect(firstRunOutput).toContain('Applying 002_test_case_templates_v4.sql');
+		expect(firstRunOutput).toContain('Applying 003_recording_session_video_object_key.sql');
 		expect(firstRunOutput).toContain('Database migrations are up to date.');
 
 		const pool = new Pool({
@@ -53,7 +54,16 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			const migRows = await pool.query<{ version: string; checksum: string }>(
 				'SELECT version, checksum FROM schema_migrations ORDER BY version'
 			);
-			expect(migRows.rows.map((r) => r.version)).toEqual(['001_init_schema.sql', '002_test_case_templates_v4.sql']);
+			expect(migRows.rows.map((r) => r.version)).toEqual([
+				'001_init_schema.sql',
+				'002_test_case_templates_v4.sql',
+				'003_recording_session_video_object_key.sql'
+			]);
+
+			const videoKeyColumn = await pool.query(
+				"SELECT 1 FROM information_schema.columns WHERE table_name = 'recording_sessions' AND column_name = 'video_object_key'"
+			);
+			expect(videoKeyColumn.rows.length).toBe(1);
 
 			// Seed template V4 default
 			const templateRows = await pool.query<{ version_label: string; is_default: boolean; gid: string; columns: string }>(
@@ -87,14 +97,15 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			expect(tableNames).toContain('recording_artifacts');
 			expect(tableNames).toContain('recording_generations');
 
-			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 2, seed V4 tidak dobel)
+			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 3, seed V4 tidak dobel)
 			const secondRunOutput = execSync(`pnpm exec tsx "${migrateScriptPath}"`, { env, encoding: 'utf-8' });
 			expect(secondRunOutput).not.toContain('Applying 001_init_schema.sql');
 			expect(secondRunOutput).not.toContain('Applying 002_test_case_templates_v4.sql');
+			expect(secondRunOutput).not.toContain('Applying 003_recording_session_video_object_key.sql');
 			expect(secondRunOutput).toContain('Database migrations are up to date.');
 
 			const migRowsAfter = await pool.query('SELECT COUNT(*) AS total FROM schema_migrations');
-			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(2);
+			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(3);
 			const templateCountAfter = await pool.query('SELECT COUNT(*) AS total FROM test_case_templates');
 			expect(parseInt(templateCountAfter.rows[0].total, 10)).toBe(1);
 		} finally {

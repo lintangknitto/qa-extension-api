@@ -1,14 +1,6 @@
 import { Client } from 'minio';
 import { minioConfig } from '.';
 
-/**
- * Presigner minimal supaya adapter bisa diuji tanpa instance MinIO nyata.
- */
-export interface IMinioPresigner {
-	presignedPutObject(bucket: string, objectKey: string, expirySeconds: number): Promise<string>;
-	presignedGetObject(bucket: string, objectKey: string, expirySeconds: number): Promise<string>;
-}
-
 let sharedClient: Client | null = null;
 
 export const getMinioClient = (): Client => {
@@ -30,17 +22,18 @@ export const resetMinioClient = (): void => {
 	sharedClient = null;
 };
 
-export const createPresignedPutUrl = (
+/**
+ * URL objek tanpa signature. Bucket diset public read+write di infra, jadi browser
+ * bisa langsung GET/PUT ke `${MINIO_PUBLIC_BASE_URL}/${bucket}/${objectKey}`.
+ */
+export const buildPublicObjectUrl = (
 	objectKey: string,
-	expirySeconds: number,
-	client: IMinioPresigner = getMinioClient()
-): Promise<string> => client.presignedPutObject(minioConfig.BUCKET, objectKey, expirySeconds);
-
-export const createPresignedGetUrl = (
-	objectKey: string,
-	expirySeconds: number,
-	client: IMinioPresigner = getMinioClient()
-): Promise<string> => client.presignedGetObject(minioConfig.BUCKET, objectKey, expirySeconds);
+	settings: { PUBLIC_BASE_URL: string; BUCKET: string } = minioConfig
+): string => {
+	const base = settings.PUBLIC_BASE_URL.trim().replace(/\/+$/, '');
+	const path = objectKey.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+	return `${base}/${encodeURIComponent(settings.BUCKET)}/${path}`;
+};
 
 export interface IMinioStatResult {
 	size: number;
@@ -59,19 +52,6 @@ export const statArtifactObject = (
 	objectKey: string,
 	client: IMinioStatClient = getMinioClient()
 ): Promise<IMinioStatResult> => client.statObject(minioConfig.BUCKET, objectKey);
-
-export const getArtifactObjectStream = (
-	objectKey: string,
-	client: Client = getMinioClient()
-): Promise<NodeJS.ReadableStream> => client.getObject(minioConfig.BUCKET, objectKey);
-
-/** Potongan byte objek (untuk HTTP Range: seek video tanpa mengunduh seluruh file). */
-export const getArtifactObjectRange = (
-	objectKey: string,
-	offset: number,
-	length: number,
-	client: Client = getMinioClient()
-): Promise<NodeJS.ReadableStream> => client.getPartialObject(minioConfig.BUCKET, objectKey, offset, length);
 
 export const putArtifactObjectBuffer = async (
 	objectKey: string,

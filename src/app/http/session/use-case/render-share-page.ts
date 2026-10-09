@@ -7,9 +7,8 @@ export const renderShareHtml = async (shareToken: string, hostUrl?: string): Pro
 	const safeJson = JSON.stringify(data).replace(/</g, '\\u003c');
 	const baseUrl = hostUrl || 'http://127.0.0.1:8010';
 	const aiContextEndpoint = `${baseUrl}/api/v1/sessions/share/${shareToken}/ai-context`;
-	// Video lewat API (diotorisasi share token): URL presigned MinIO menunjuk host internal/127.0.0.1
-	// sehingga tidak bisa diputar dari komputer lain, dan kedaluwarsa setelah 7 hari.
-	const videoSrc = `${baseUrl}/share/${encodeURIComponent(shareToken)}/video`;
+	// Video langsung dari MinIO (bucket public, tanpa signature); dihitung dari `video_object_key`.
+	const videoSrc = s.video_url ? String(s.video_url) : '';
 
 	const statusColor =
 		s.result === 'PASS'

@@ -11,6 +11,7 @@ export interface RecordingInfraSettings {
 		ACCESS_KEY: string;
 		SECRET_KEY: string;
 		BUCKET: string;
+		PUBLIC_BASE_URL: string;
 	};
 }
 
@@ -24,7 +25,8 @@ export const currentRecordingInfraSettings = (): RecordingInfraSettings => ({
 		ENDPOINT: minioConfig.ENDPOINT,
 		ACCESS_KEY: minioConfig.ACCESS_KEY,
 		SECRET_KEY: minioConfig.SECRET_KEY,
-		BUCKET: minioConfig.BUCKET
+		BUCKET: minioConfig.BUCKET,
+		PUBLIC_BASE_URL: minioConfig.PUBLIC_BASE_URL
 	}
 });
 
@@ -43,6 +45,7 @@ export const collectRecordingInfraProblems = (settings: RecordingInfraSettings):
 	if (!settings.minio.ACCESS_KEY.trim()) problems.push('MINIO_ACCESS_KEY');
 	if (!settings.minio.SECRET_KEY.trim()) problems.push('MINIO_SECRET_KEY');
 	if (!settings.minio.BUCKET.trim()) problems.push('MINIO_BUCKET');
+	if (!settings.minio.PUBLIC_BASE_URL.trim()) problems.push('MINIO_PUBLIC_BASE_URL');
 
 	return problems;
 };

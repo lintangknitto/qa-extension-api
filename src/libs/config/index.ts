@@ -48,7 +48,9 @@ export const minioConfig = {
 	REGION: process.env.MINIO_REGION || 'us-east-1',
 	ACCESS_KEY: process.env.MINIO_ACCESS_KEY || '',
 	SECRET_KEY: process.env.MINIO_SECRET_KEY || '',
-	BUCKET: process.env.MINIO_BUCKET || 'qa-recording-artifacts'
+	BUCKET: process.env.MINIO_BUCKET || 'qa-recording-artifacts',
+	/** Host MinIO yang dijangkau browser (bucket public); dipakai untuk URL objek tanpa signature. */
+	PUBLIC_BASE_URL: (process.env.MINIO_PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '')
 };
 
 const csv = (value: string | undefined, fallback: string): string[] =>

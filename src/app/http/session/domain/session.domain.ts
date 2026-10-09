@@ -3,6 +3,7 @@ import {
 	NotAuthorizationException,
 	NotFoundException
 } from '@knittotextile/knitto-core-backend/dist/CoreException';
+import { buildPublicObjectUrl } from '@/libs/config/minioClient';
 import { canManageProjects } from '@/libs/helpers/access';
 
 export const SESSION_STATUS = {
@@ -66,7 +67,7 @@ export const toSessionResponse = (session: Entity.IQaRecordingSession) => {
 		result: value(session.result),
 		actual_result: value(session.actual_result),
 		share_token: value(session.share_token),
-		video_url: value(session.video_url),
+		video_url: session.video_object_key ? buildPublicObjectUrl(session.video_object_key) : null,
 		record_video: session.record_video !== undefined ? Number(session.record_video) : 1,
 		last_sequence: Number(session.last_sequence ?? 0),
 		started_at: value(session.started_at),

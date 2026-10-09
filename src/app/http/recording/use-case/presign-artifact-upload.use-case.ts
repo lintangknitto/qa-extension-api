@@ -1,5 +1,5 @@
 import { PROJECT_ADMIN_LEVELS, recordingConfig } from '@/libs/config';
-import { createPresignedPutUrl } from '@/libs/config/minioClient';
+import { buildPublicObjectUrl } from '@/libs/config/minioClient';
 import {
 	assertAllowedContentType,
 	assertSizeAllowed,
@@ -41,7 +41,8 @@ export const presignArtifactUploadUseCase = async (ctx: {
 		sequence: ctx.input.sequence ?? null
 	});
 
-	const uploadUrl = await createPresignedPutUrl(objectKey, recordingConfig.PRESIGN_EXPIRY_SECONDS);
+	// Bucket public read+write: URL upload tanpa signature (tidak kedaluwarsa).
+	const uploadUrl = buildPublicObjectUrl(objectKey);
 	const created = await artifactQueries.findArtifactById(idArtifact);
 
 	return {
