@@ -31,10 +31,16 @@ curl -X DELETE http://<host-minio>:9000/qa-recording-artifacts/_probe/anon.txt  
 | Env | Contoh | Keterangan |
 |---|---|---|
 | `MINIO_ENDPOINT` / `MINIO_PORT` | `host.docker.internal` / `9000` | Host yang dipakai API (server-side: `statObject`, upload langsung). |
-| `MINIO_PUBLIC_BASE_URL` | `http://192.168.20.2:9000` | Host yang dijangkau **browser tester**. Wajib bila recording aktif. Trailing slash diabaikan. |
+| `MINIO_PUBLIC_BASE_URL` | `http://192.168.20.2:9000` | Host yang dijangkau **browser tester**. Wajib bila recording aktif, harus URL absolut `http://`/`https://` (API menolak start bila tidak). Trailing slash diabaikan. |
 
 `video_url` dan URL artifact dihitung saat dibaca dari object key, jadi mengganti `MINIO_PUBLIC_BASE_URL`
 langsung mengubah semua URL tanpa migrasi data. Skrip `db:regenerate-video-urls` sudah dihapus.
+
+> **Mixed content.** Bila API/halaman share disajikan lewat HTTPS, `MINIO_PUBLIC_BASE_URL` juga harus HTTPS;
+> browser memblokir video/gambar `http://` di halaman `https://`.
+
+Field `expires_in` di response presign/download sudah deprecated: URL tidak kedaluwarsa, dan
+`RECORDING_PRESIGN_EXPIRY_SECONDS` sekarang hanya mengisi field itu.
 
 ## 3. Data lama
 

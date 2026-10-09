@@ -945,7 +945,7 @@ paths:
     post:
       tags: [sessions]
       summary: Buat URL upload video
-      description: URL upload publik tanpa signature (bucket MinIO public read+write). Object key `sessions/<id_session>/video/<uuid>.webm`.
+      description: URL upload publik tanpa signature (bucket MinIO public read+write). Field `expires_in` deprecated (URL tidak kedaluwarsa). Object key `sessions/<id_session>/video/<uuid>.webm`.
       operationId: postSessionVideoPresign
       parameters:
         - $ref: '#/components/parameters/SessionId'
@@ -1070,7 +1070,7 @@ paths:
     post:
       tags: [artifacts]
       summary: Buat URL upload artifact
-      description: URL upload publik tanpa signature (bucket MinIO public read+write). `expires_in` dipertahankan demi kompatibilitas.
+      description: URL upload publik tanpa signature (bucket MinIO public read+write). Field `expires_in` deprecated (URL tidak kedaluwarsa), dipertahankan demi kompatibilitas dan akan dihapus.
       operationId: postSessionArtifactPresign
       parameters:
         - $ref: '#/components/parameters/SessionId'
@@ -1145,7 +1145,7 @@ paths:
     get:
       tags: [artifacts]
       summary: Buat URL download artifact
-      description: URL publik MinIO tanpa signature (bucket public read).
+      description: URL publik MinIO tanpa signature (bucket public read). Field `expires_in` deprecated (URL tidak kedaluwarsa).
       operationId: getSessionArtifactDownloadUrl
       parameters:
         - $ref: '#/components/parameters/SessionId'

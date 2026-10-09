@@ -45,7 +45,8 @@ export const collectRecordingInfraProblems = (settings: RecordingInfraSettings):
 	if (!settings.minio.ACCESS_KEY.trim()) problems.push('MINIO_ACCESS_KEY');
 	if (!settings.minio.SECRET_KEY.trim()) problems.push('MINIO_SECRET_KEY');
 	if (!settings.minio.BUCKET.trim()) problems.push('MINIO_BUCKET');
-	if (!settings.minio.PUBLIC_BASE_URL.trim()) problems.push('MINIO_PUBLIC_BASE_URL');
+	// Wajib URL absolut http(s); tanpa skema, URL objek jadi relatif terhadap halaman.
+	if (!/^https?:\/\/[^/\s]+/i.test(settings.minio.PUBLIC_BASE_URL.trim())) problems.push('MINIO_PUBLIC_BASE_URL');
 
 	return problems;
 };
