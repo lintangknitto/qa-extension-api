@@ -5,6 +5,8 @@ import { updateProgramUseCase } from '../../use-case/update-program.use-case';
 import { deleteProgramUseCase } from '../../use-case/delete-program.use-case';
 import { listProgramsUseCase, listActiveProgramsUseCase } from '../../use-case/list-programs.use-case';
 
+// Pemicu auto-index (GitHub + DB) tidak boleh jalan di unit test.
+jest.mock('@/app/http/codebase-memory/services/auto-index.service');
 jest.mock('../../queries/program.queries');
 jest.mock('../../repo/program.repo');
 

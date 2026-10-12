@@ -1349,20 +1349,45 @@ paths:
     post:
       tags: [codebase]
       summary: Sinkronisasi dan index codebase project
+      description: >-
+        Body kosong = semua repo project (repo program yang ditautkan, fallback repo_url project) di-sync
+        incremental di background (`completed: false`); pantau lewat GET /projects/{id_project}/codebase/status.
+        `repo_url` + `branch` membatasi ke satu repo; hanya repo milik project dan branch efektifnya (branch program
+        atau default branch repo) yang diterima, selain itu ditolak seperti akses tanpa wewenang. `base_dir` meng-index salinan lokal ke repo yang sama
+        dan hanya untuk ADMIN/SUPERADMIN.
+        Token GitHub hanya dari env server (GITHUB_TOKEN).
       operationId: postProjectCodebaseSync
       parameters:
         - $ref: '#/components/parameters/ProjectId'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema: { $ref: '#/components/schemas/SyncCodebaseRequest' }
       responses:
         '200':
-          description: Hasil sinkronisasi index
+          description: Repo yang di-sync (background) atau hasil sync (salinan lokal)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/KnittoSuccessEnvelope' }
+  /projects/{id_project}/codebase/status:
+    get:
+      tags: [codebase]
+      summary: Status index kode per repo project (auto-index)
+      operationId: getProjectCodebaseStatus
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Status index per repo
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/KnittoSuccessEnvelope'
+                  - type: object
+                    properties:
+                      result: { $ref: '#/components/schemas/CodebaseStatus' }
   /projects/{id_project}/codebase/search:
     post:
       tags: [codebase]
@@ -1597,7 +1622,8 @@ components:
         grafana_dashboard_url: { type: string, maxLength: 500 }
         description: { type: string, maxLength: 2000 }
         base_url: { type: string, maxLength: 500 }
-        repo_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500, description: 'Repo GitHub; owner harus ada di GITHUB_ALLOWED_OWNERS (default knittotextile), selain itu 400.' }
+        repo_branch: { type: string, maxLength: 255, description: 'Branch repo yang di-index codebase memory. Kosong = default branch repo.' }
         is_active: { type: boolean }
     UpdateProgramRequest:
       type: object
@@ -1608,7 +1634,8 @@ components:
         grafana_dashboard_url: { type: string, maxLength: 500 }
         description: { type: string, maxLength: 2000 }
         base_url: { type: string, maxLength: 500 }
-        repo_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500, description: 'Repo GitHub; owner harus ada di GITHUB_ALLOWED_OWNERS (default knittotextile), selain itu 400.' }
+        repo_branch: { type: string, maxLength: 255, description: 'Branch repo yang di-index codebase memory. Kosong = default branch repo.' }
         is_active: { type: boolean }
     CreateProjectRequest:
       type: object
@@ -1622,7 +1649,7 @@ components:
         code: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
         description: { type: string, maxLength: 2000 }
         base_url: { type: string, maxLength: 500 }
-        repo_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500, description: 'Repo GitHub; owner harus ada di GITHUB_ALLOWED_OWNERS (default knittotextile), selain itu 400.' }
         is_active: { type: boolean }
         release_version: { type: string, nullable: true, maxLength: 100 }
         test_app_folder: { type: string, nullable: true, maxLength: 255 }
@@ -1644,7 +1671,7 @@ components:
         name: { type: string, minLength: 3, maxLength: 150 }
         description: { type: string, maxLength: 2000 }
         base_url: { type: string, maxLength: 500 }
-        repo_url: { type: string, maxLength: 500 }
+        repo_url: { type: string, maxLength: 500, description: 'Repo GitHub; owner harus ada di GITHUB_ALLOWED_OWNERS (default knittotextile), selain itu 400.' }
         is_active: { type: boolean }
         release_version: { type: string, nullable: true, maxLength: 100 }
         test_app_folder: { type: string, nullable: true, maxLength: 255 }
@@ -1881,12 +1908,31 @@ components:
     SyncCodebaseRequest:
       type: object
       properties:
-        source_type: { type: string }
         base_dir: { type: string }
         repo_url: { type: string }
         branch: { type: string }
-        github_token: { type: string, writeOnly: true }
         force_reindex: { type: boolean }
+    CodebaseStatus:
+      type: object
+      properties:
+        id_project: { type: integer }
+        can_sync: { type: boolean, description: User boleh memicu sync manual. }
+        repos:
+          type: array
+          items:
+            type: object
+            properties:
+              repo: { type: string, example: knittotextile/knitto-widget-chat }
+              repo_url: { type: string }
+              branch: { type: string, nullable: true }
+              tracks_default_branch: { type: boolean }
+              program: { type: string, nullable: true }
+              status: { type: string, enum: [not_indexed, syncing, idle, failed] }
+              last_indexed_sha: { type: string, nullable: true }
+              last_synced_at: { type: string, format: date-time, nullable: true }
+              last_checked_at: { type: string, format: date-time, nullable: true }
+              last_error: { type: string, nullable: true }
+              files_indexed: { type: integer }
     SearchCodebaseRequest:
       type: object
       required: [query]

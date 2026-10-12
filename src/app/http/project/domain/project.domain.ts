@@ -70,7 +70,8 @@ export const canManageSpecificProject = (
 		if (project.created_by_user_id === undefined || project.created_by_user_id === null) {
 			return true;
 		}
-		if (typeof userId === 'number' && Number(project.created_by_user_id) === Number(userId)) {
+		// id_user BIGINT tiba sebagai string dari JWT: bandingkan sebagai angka, jangan cek typeof.
+		if (userId !== undefined && userId !== null && Number(project.created_by_user_id) === Number(userId)) {
 			return true;
 		}
 		return false;

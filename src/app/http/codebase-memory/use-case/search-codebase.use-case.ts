@@ -3,6 +3,7 @@ import { assertProjectExists, assertCanManageSpecificProject } from '@/app/http/
 import embeddingService from '@/libs/services/embedding.service';
 import { searchCodebaseChunksByVector, searchCodebaseSymbols } from '../queries/codebase.queries';
 import type { TSearchCodebaseBodyValidation } from '../codebase.request';
+import { indexedRepoIds, listProjectRepos } from '../services/project-repos.service';
 
 export interface ISearchCodebaseItem {
 	chunk_id: number;
@@ -30,6 +31,7 @@ export const searchCodebaseUseCase = async (
 	assertProjectExists(project);
 	assertCanManageSpecificProject(data.userLevel, data.userId, project);
 
+	const repoIds = indexedRepoIds(await listProjectRepos(project));
 	const limit = data.limit ?? 10;
 	const threshold = data.similarity_threshold ?? 0.3;
 
@@ -39,14 +41,14 @@ export const searchCodebaseUseCase = async (
 
 	// 2. Vector Cosine Similarity Search
 	const chunkResults = await searchCodebaseChunksByVector(
-		data.id_project,
+		repoIds,
 		vectorStr,
 		limit,
 		threshold
 	);
 
 	// 3. Exact / Keyword Symbol Search fallback/supplement
-	const matchedSymbols = await searchCodebaseSymbols(data.id_project, data.query, data.kind, 5);
+	const matchedSymbols = await searchCodebaseSymbols(repoIds, data.query, data.kind, 5);
 
 	const items: ISearchCodebaseItem[] = chunkResults.map((r) => ({
 		chunk_id: r.id_chunk,

@@ -4,12 +4,15 @@ import type { TCreateProjectValidation } from '../project.request';
 import * as domain from '../domain/project.domain';
 import * as queries from '../queries/project.queries';
 import * as repo from '../repo/project.repo';
+import { assertRepoUrlAllowed } from '@/app/http/codebase-memory/domain/codebase-repo.domain';
+import { triggerProjectRepoIndex } from '@/app/http/codebase-memory/services/auto-index.service';
 
 export const createProjectUseCase = async (ctx: {
 	userId: number;
 	userLevel: string | undefined;
 	input: TCreateProjectValidation;
 }) => {
+	assertRepoUrlAllowed(ctx.input.repo_url);
 	domain.assertCanManageProjects(ctx.userLevel, PROJECT_ADMIN_LEVELS);
 
 	const code = domain.resolveProjectCode(ctx.input.name, ctx.input.code);
@@ -36,6 +39,8 @@ export const createProjectUseCase = async (ctx: {
 		metadata: domain.pickProjectMetadata(ctx.input)
 	});
 
-	const created = await queries.findProjectById(idProject);
-	return domain.toProjectResponse(domain.assertProjectExists(created));
+	const created = domain.assertProjectExists(await queries.findProjectById(idProject));
+	// Repo program/project → index kode di background (respons tidak menunggu).
+	triggerProjectRepoIndex(created);
+	return domain.toProjectResponse(created);
 };

@@ -6,6 +6,17 @@ export interface IGitHubRepoInfo {
 	repo: string;
 }
 
+/**
+ * Pesan error GitHub yang bisa ditindaklanjuti tanpa membocorkan token. 404 juga dipakai GitHub
+ * untuk repo private yang tidak bisa diakses token.
+ */
+export const describeGitHubStatus = (status: number, target: string): string => {
+	if (status === 401) return `Token GitHub tidak valid atau kedaluwarsa (401) saat mengakses ${target}. Perbarui GITHUB_TOKEN di server.`;
+	if (status === 403) return `Akses GitHub ditolak atau rate limit tercapai (403) saat mengakses ${target}.`;
+	if (status === 404) return `Repo atau branch ${target} tidak ditemukan, atau GITHUB_TOKEN tidak punya akses ke repo private ini (404).`;
+	return `GitHub API error ${status} saat mengakses ${target}.`;
+};
+
 export interface IGitHubTreeItem {
 	path: string;
 	sha: string;
@@ -35,6 +46,49 @@ export class GitHubService {
 		};
 	}
 
+	private headers(customToken?: string): Record<string, string> {
+		const token = customToken || this.defaultToken;
+		const headers: Record<string, string> = {
+			Accept: 'application/vnd.github.v3+json',
+			'User-Agent': 'Knitto-Codebase-Memory-Sync'
+		};
+		if (token && !token.startsWith('ghp_placeholder')) headers['Authorization'] = `Bearer ${token}`;
+		return headers;
+	}
+
+	private async getJson<T>(endpoint: string, target: string, customToken?: string): Promise<T> {
+		let res: Response;
+		try {
+			res = await fetch(endpoint, { method: 'GET', headers: this.headers(customToken) });
+		} catch (err: unknown) {
+			throw new GeneralException(`Gagal menghubungi GitHub (${target}): ${(err as Error).message}`);
+		}
+		if (!res.ok) throw new GeneralException(describeGitHubStatus(res.status, target));
+		return (await res.json()) as T;
+	}
+
+	/** Default branch repo (mis. `main`). */
+	public async getDefaultBranch(owner: string, repo: string, customToken?: string): Promise<string> {
+		const data = await this.getJson<{ default_branch?: string }>(
+			`${githubConfig.API_BASE_URL}/repos/${owner}/${repo}`,
+			`${owner}/${repo}`,
+			customToken
+		);
+		if (!data.default_branch) throw new GeneralException(`Default branch ${owner}/${repo} tidak diketahui.`);
+		return data.default_branch;
+	}
+
+	/** SHA commit terakhir sebuah branch — dipakai untuk melewati sync bila repo tidak berubah. */
+	public async getBranchHeadSha(owner: string, repo: string, branch: string, customToken?: string): Promise<string> {
+		const data = await this.getJson<{ sha?: string }>(
+			`${githubConfig.API_BASE_URL}/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`,
+			`${owner}/${repo}@${branch}`,
+			customToken
+		);
+		if (!data.sha) throw new GeneralException(`SHA commit ${owner}/${repo}@${branch} tidak diketahui.`);
+		return data.sha;
+	}
+
 	public async listRepositoryCodeFiles(
 		owner: string,
 		repo: string,
@@ -42,7 +96,7 @@ export class GitHubService {
 		customToken?: string
 	): Promise<IGitHubTreeItem[]> {
 		const token = customToken || this.defaultToken;
-		const endpoint = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+		const endpoint = `${githubConfig.API_BASE_URL}/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
 
 		const headers: Record<string, string> = {
 			Accept: 'application/vnd.github.v3+json',
@@ -56,18 +110,7 @@ export class GitHubService {
 		try {
 			const res = await fetch(endpoint, { method: 'GET', headers });
 			if (!res.ok) {
-				const errText = await res.text();
-				if (res.status === 401 || res.status === 403) {
-					throw new GeneralException(
-						`Akses GitHub private repo ditolak (${res.status}). Pastikan GITHUB_TOKEN telah dikonfigurasi dengan benar.`
-					);
-				}
-				if (res.status === 404) {
-					throw new GeneralException(
-						`Repository atau branch "${owner}/${repo}@${branch}" tidak ditemukan di GitHub (404).`
-					);
-				}
-				throw new GeneralException(`GitHub API error ${res.status}: ${errText}`);
+				throw new GeneralException(describeGitHubStatus(res.status, `${owner}/${repo}@${branch}`));
 			}
 
 			const data = (await res.json()) as { tree?: Array<{ path: string; sha: string; type: string; size?: number }> };
@@ -112,7 +155,7 @@ export class GitHubService {
 		customToken?: string
 	): Promise<string> {
 		const token = customToken || this.defaultToken;
-		const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
+		const endpoint = `${githubConfig.API_BASE_URL}/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
 
 		const headers: Record<string, string> = {
 			Accept: 'application/vnd.github.v3+json',

@@ -92,6 +92,15 @@ export const grafanaConfig = {
 };
 
 export const githubConfig = {
-	TOKEN: process.env.GITHUB_TOKEN || ''
+	TOKEN: process.env.GITHUB_TOKEN || '',
+	/** Bisa diarahkan ke mock GitHub di E2E. */
+	API_BASE_URL: (process.env.GITHUB_API_BASE_URL || 'https://api.github.com').replace(/\/+$/, ''),
+	/** Owner GitHub yang repo-nya boleh di-index dengan token server (lowercase). */
+	ALLOWED_OWNERS: csv(process.env.GITHUB_ALLOWED_OWNERS, 'knittotextile').map((owner) => owner.toLowerCase())
+};
+
+/** Auto-index codebase memory: interval cek SHA commit repo (menit); 0 = job berkala mati. */
+export const codebaseAutoSyncConfig = {
+	INTERVAL_MINUTES: process.env.CODEBASE_AUTO_SYNC_INTERVAL_MINUTES ? Math.max(0, Number(process.env.CODEBASE_AUTO_SYNC_INTERVAL_MINUTES) || 0) : 30
 };
 

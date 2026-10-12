@@ -41,6 +41,7 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 		expect(firstRunOutput).toContain('Applying 003_recording_session_video_object_key.sql');
 		expect(firstRunOutput).toContain('Applying 004_recording_session_runs.sql');
 		expect(firstRunOutput).toContain('Applying 005_recording_checkpoint_targets.sql');
+		expect(firstRunOutput).toContain('Applying 006_codebase_repo_index.sql');
 		expect(firstRunOutput).toContain('Database migrations are up to date.');
 
 		const pool = new Pool({
@@ -61,8 +62,26 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 				'002_test_case_templates_v4.sql',
 				'003_recording_session_video_object_key.sql',
 				'004_recording_session_runs.sql',
-				'005_recording_checkpoint_targets.sql'
+				'005_recording_checkpoint_targets.sql',
+				'006_codebase_repo_index.sql'
 			]);
+
+			// Index codebase per repo+branch (006): file/simbol/chunk menunjuk codebase_repos, bukan project.
+			const codebaseColumns = await pool.query<{ table_name: string; column_name: string }>(
+				`SELECT table_name, column_name FROM information_schema.columns
+				 WHERE table_name IN ('codebase_files', 'codebase_symbols', 'codebase_chunks') AND column_name IN ('id_project', 'id_repo', 'git_blob_sha')
+				 ORDER BY table_name, column_name`
+			);
+			expect(codebaseColumns.rows).toEqual([
+				{ table_name: 'codebase_chunks', column_name: 'id_repo' },
+				{ table_name: 'codebase_files', column_name: 'git_blob_sha' },
+				{ table_name: 'codebase_files', column_name: 'id_repo' },
+				{ table_name: 'codebase_symbols', column_name: 'id_repo' }
+			]);
+			const repoTable = await pool.query("SELECT to_regclass('codebase_repos') IS NOT NULL AS ok");
+			expect(repoTable.rows[0].ok).toBe(true);
+			const programBranch = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_name = 'programs' AND column_name = 'repo_branch'");
+			expect(programBranch.rowCount).toBe(1);
 
 			// Checkpoint ber-target (005): kolom baru nullable, data lama tetap valid.
 			const checkpointColumns = await pool.query<{ column_name: string; data_type: string; is_nullable: string }>(
@@ -125,7 +144,7 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			expect(secondRunOutput).toContain('Database migrations are up to date.');
 
 			const migRowsAfter = await pool.query('SELECT COUNT(*) AS total FROM schema_migrations');
-			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(5);
+			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(6);
 			const templateCountAfter = await pool.query('SELECT COUNT(*) AS total FROM test_case_templates');
 			expect(parseInt(templateCountAfter.rows[0].total, 10)).toBe(1);
 		} finally {

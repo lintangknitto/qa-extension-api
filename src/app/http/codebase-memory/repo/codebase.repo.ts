@@ -2,32 +2,46 @@ import postgresConnection from '@/libs/config/postgresConnection';
 import type { IExtractedSymbol } from '../services/ast-parser.service';
 import type { ICodeChunk } from '../services/chunker.service';
 
+/** Hash penanda file yang sedang/gagal di-index: tidak pernah sama dengan hash konten, jadi selalu diulang. */
+export const PENDING_FILE_HASH = '';
+
+/** Catat hash konten & blob git setelah simbol dan chunk file tersimpan. */
+export const markCodebaseFileIndexed = async (idFile: number, fileHash: string, gitBlobSha: string | null): Promise<void> => {
+	await postgresConnection.raw(
+		'UPDATE codebase_files SET file_hash = $2, git_blob_sha = $3, updated_at = CURRENT_TIMESTAMP WHERE id_file = $1',
+		[idFile, fileHash, gitBlobSha]
+	);
+};
+
 export const upsertCodebaseFile = async (
-	idProject: number,
+	idRepo: number,
 	filePath: string,
 	fileHash: string,
 	language: string,
 	totalLines: number,
-	astSummary: Record<string, unknown>
+	astSummary: Record<string, unknown>,
+	gitBlobSha: string | null = null
 ): Promise<number> => {
 	const [row] = await postgresConnection.raw<Array<{ id_file: number | string }>>(
 		`INSERT INTO codebase_files (
-			id_project, file_path, file_hash, language, total_lines, ast_summary, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
-		ON CONFLICT (id_project, file_path) DO UPDATE SET
+			id_repo, file_path, file_hash, language, total_lines, ast_summary, git_blob_sha, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+		ON CONFLICT (id_repo, file_path) DO UPDATE SET
 			file_hash = EXCLUDED.file_hash,
 			language = EXCLUDED.language,
 			total_lines = EXCLUDED.total_lines,
 			ast_summary = EXCLUDED.ast_summary,
+			git_blob_sha = EXCLUDED.git_blob_sha,
 			updated_at = CURRENT_TIMESTAMP
 		RETURNING id_file`,
 		[
-			idProject,
+			idRepo,
 			filePath,
 			fileHash,
 			language,
 			totalLines,
-			JSON.stringify(astSummary)
+			JSON.stringify(astSummary),
+			gitBlobSha
 		]
 	);
 
@@ -40,7 +54,7 @@ export const deleteFileSymbolsAndChunks = async (idFile: number): Promise<void> 
 };
 
 export const insertCodebaseSymbols = async (
-	idProject: number,
+	idRepo: number,
 	idFile: number,
 	symbols: IExtractedSymbol[]
 ): Promise<void> => {
@@ -56,7 +70,7 @@ export const insertCodebaseSymbols = async (
 		);
 		params.push(
 			idFile,
-			idProject,
+			idRepo,
 			sym.name,
 			sym.kind,
 			sym.signature || null,
@@ -70,7 +84,7 @@ export const insertCodebaseSymbols = async (
 
 	const query = `
 		INSERT INTO codebase_symbols (
-			id_file, id_project, name, kind, signature, docstring,
+			id_file, id_repo, name, kind, signature, docstring,
 			start_line, end_line, scope_path, metadata
 		) VALUES ${valuesClauses.join(', ')}
 	`;
@@ -79,7 +93,7 @@ export const insertCodebaseSymbols = async (
 };
 
 export const insertCodebaseChunks = async (
-	idProject: number,
+	idRepo: number,
 	idFile: number,
 	chunksWithEmbeddings: Array<{ chunk: ICodeChunk; vectorStr: string }>
 ): Promise<void> => {
@@ -95,7 +109,7 @@ export const insertCodebaseChunks = async (
 		);
 		params.push(
 			idFile,
-			idProject,
+			idRepo,
 			item.chunk.chunk_type,
 			item.chunk.content,
 			item.chunk.start_line,
@@ -107,7 +121,7 @@ export const insertCodebaseChunks = async (
 
 	const query = `
 		INSERT INTO codebase_chunks (
-			id_file, id_project, chunk_type, content, start_line, end_line, embedding, metadata
+			id_file, id_repo, chunk_type, content, start_line, end_line, embedding, metadata
 		) VALUES ${valuesClauses.join(', ')}
 	`;
 
@@ -115,20 +129,20 @@ export const insertCodebaseChunks = async (
 };
 
 export const pruneRemovedFiles = async (
-	idProject: number,
+	idRepo: number,
 	activeFilePaths: string[]
 ): Promise<number> => {
 	if (activeFilePaths.length === 0) {
 		const [res] = await postgresConnection.raw<Array<{ count: string | number }>>(
-			'WITH deleted AS (DELETE FROM codebase_files WHERE id_project = $1 RETURNING *) SELECT count(*) FROM deleted',
-			[idProject]
+			'WITH deleted AS (DELETE FROM codebase_files WHERE id_repo = $1 RETURNING *) SELECT count(*) FROM deleted',
+			[idRepo]
 		);
 		return Number(res?.count ?? 0);
 	}
 
 	const [res] = await postgresConnection.raw<Array<{ count: string | number }>>(
-		'WITH deleted AS (DELETE FROM codebase_files WHERE id_project = $1 AND file_path != ALL($2) RETURNING *) SELECT count(*) FROM deleted',
-		[idProject, activeFilePaths]
+		'WITH deleted AS (DELETE FROM codebase_files WHERE id_repo = $1 AND file_path != ALL($2) RETURNING *) SELECT count(*) FROM deleted',
+		[idRepo, activeFilePaths]
 	);
 	return Number(res?.count ?? 0);
 };

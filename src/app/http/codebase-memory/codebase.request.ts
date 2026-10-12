@@ -30,11 +30,9 @@ export const projectParamValidation = object({
 export type TProjectParamValidation = InferOutput<typeof projectParamValidation>;
 
 export const syncCodebaseBodyValidation = object({
-	source_type: optional(string(ERROR_VALIDATION_MSG.string('Source Type'))),
 	base_dir: optional(string(ERROR_VALIDATION_MSG.string('Base Directory'))),
 	repo_url: optional(string(ERROR_VALIDATION_MSG.string('Repository URL'))),
 	branch: optional(string(ERROR_VALIDATION_MSG.string('Branch'))),
-	github_token: optional(string(ERROR_VALIDATION_MSG.string('GitHub Token'))),
 	force_reindex: optional(boolean())
 });
 export type TSyncCodebaseBodyValidation = InferOutput<typeof syncCodebaseBodyValidation>;

@@ -16,7 +16,7 @@ import { logger } from '@knittotextile/knitto-core-backend';
 import dashboard from '../../../observability/__tests__/fixtures/monitoring-logs-docker.dashboard.json';
 import * as generationRepo from '@/app/http/recording/repo/generation.repo';
 import type { IAiInputEvent } from '../../domain/ai-input';
-import { persistInvestigation, runInvestigation, startInvestigationInBackground } from '../../use-case/investigate-session.use-case';
+import { buildInvestigationContext, persistInvestigation, runInvestigation, startInvestigationInBackground } from '../../use-case/investigate-session.use-case';
 
 const DASHBOARD_URL =
 	'http://grafana.test/d/5cb00b4e-0cd6-44a5-b6e0-361b31c966a5/monitoring-logs-docker?orgId=1&var-provider=GCP&var-environment=STAGING&var-cabang=GCP-SANDBOX&var-service=SERVICE_NAME&var-search_value=&var-search_value_2=&var-loki_ds=bff5y085q5d6oe';
@@ -48,7 +48,7 @@ const makeDeps = () => {
 		grafana: { getDashboard: jest.fn().mockResolvedValue(dashboard), queryLokiLogs },
 		completer: { complete: jest.fn().mockResolvedValue('## Ringkasan\nDuplikasi key saat simpan pesan.') },
 		listPrograms: jest.fn().mockResolvedValue(programs),
-		findCodeContext: jest.fn().mockResolvedValue([{ file_path: 'src/chat/send.ts', start_line: 10, end_line: 20, content: 'insert into messages' }])
+		findCodeContext: jest.fn().mockResolvedValue({ chunks: [{ file_path: 'src/chat/send.ts', start_line: 10, end_line: 20, similarity: 0.9, content: 'insert into messages' }], notes: [] })
 	};
 };
 
@@ -171,5 +171,13 @@ describe('investigate-session', () => {
 		expect(result).toEqual({ status: 'failed', error: 'timeout' });
 		expect(generationRepo.startGeneration).toHaveBeenCalledWith(expect.objectContaining({ idSession: 5, kind: 'investigation' }));
 		expect(generationRepo.markGenerationFailed).toHaveBeenCalledWith(21, 'timeout');
+	});
+
+	it('konteks kode: catatan status index ditulis menggantikan "tidak ada potongan kode"', () => {
+		const session = { id_session: 1, title: 'Kirim pesan' } as Entity.IQaRecordingSession;
+		const withNote = buildInvestigationContext(session, [], [], [], [], ['knittotextile/knitto-api-chat@develop: index kode sedang dibangun, konteks kode belum tersedia untuk investigasi ini.']);
+		expect(withNote).toContain('- knittotextile/knitto-api-chat@develop: index kode sedang dibangun');
+		expect(withNote).not.toContain('(tidak ada potongan kode yang relevan)');
+		expect(buildInvestigationContext(session, [], [], [], [])).toContain('(tidak ada potongan kode yang relevan)');
 	});
 });

@@ -2,6 +2,14 @@ import type { TUpdateProjectValidation } from '../project.request';
 import * as domain from '../domain/project.domain';
 import * as queries from '../queries/project.queries';
 import * as repo from '../repo/project.repo';
+import { assertRepoUrlAllowed, resolveProjectRepoTargets } from '@/app/http/codebase-memory/domain/codebase-repo.domain';
+import { triggerProjectRepoIndex } from '@/app/http/codebase-memory/services/auto-index.service';
+
+const repoSignature = (project: Entity.IQaProject): string =>
+	resolveProjectRepoTargets(project)
+		.map((t) => `${t.repo_key}@${t.branch ?? ''}`)
+		.sort()
+		.join(',');
 
 export const updateProjectUseCase = async (ctx: {
 	userId: number;
@@ -9,6 +17,7 @@ export const updateProjectUseCase = async (ctx: {
 	idProject: number;
 	input: TUpdateProjectValidation;
 }) => {
+	assertRepoUrlAllowed(ctx.input.repo_url);
 	const current = domain.assertProjectExists(await queries.findProjectById(ctx.idProject));
 	domain.assertCanManageSpecificProject(ctx.userLevel, ctx.userId, current);
 
@@ -38,6 +47,8 @@ export const updateProjectUseCase = async (ctx: {
 		metadata: domain.pickProjectMetadata(ctx.input)
 	});
 
-	const updated = await queries.findProjectById(ctx.idProject);
-	return domain.toProjectResponse(domain.assertProjectExists(updated));
+	const updated = domain.assertProjectExists(await queries.findProjectById(ctx.idProject));
+	// Tautan program / repo_url berubah → index repo project di background.
+	if (repoSignature(updated) !== repoSignature(current)) triggerProjectRepoIndex(updated);
+	return domain.toProjectResponse(updated);
 };

@@ -109,3 +109,11 @@ describe('program.domain', () => {
 		});
 	});
 });
+
+describe('canManageSpecificProgram — userId dari JWT (BIGINT sebagai string)', () => {
+	it('QA pembuat program dikenali walau userId string', () => {
+		const program = { id_program: 1, created_by_user_id: '7' } as unknown as Entity.IQaProgram;
+		expect(canManageSpecificProgram('QA', '7' as unknown as number, program)).toBe(true);
+		expect(canManageSpecificProgram('QA', '8' as unknown as number, program)).toBe(false);
+	});
+});

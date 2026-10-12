@@ -2,7 +2,7 @@ import { logger } from '@knittotextile/knitto-core-backend';
 import { openAiConfig, PROJECT_ADMIN_LEVELS } from '@/libs/config';
 import { createOpenAiCompleter, type IAiCompleter } from '@/libs/config/openaiClient';
 import grafanaService, { type GrafanaService } from '@/app/http/observability/services/grafana.service';
-import { findMatchingCodeContext } from '@/app/http/observability/use-case/correlate-session-logs.use-case';
+import { getProjectCodeContext, type IProjectCodeContext } from '@/app/http/codebase-memory/use-case/project-code-context.use-case';
 import {
 	buildFilteredDashboardUrl,
 	effectiveVariables,
@@ -58,7 +58,7 @@ export interface InvestigationDeps {
 	grafana?: GrafanaPort;
 	completer?: IAiCompleter;
 	listPrograms?: (idProject: number) => Promise<Entity.IQaProgram[]>;
-	findCodeContext?: typeof findMatchingCodeContext;
+	findCodeContext?: typeof getProjectCodeContext;
 }
 
 // Log server bisa memuat token/kredensial: redaksi sebelum ke AI, penyimpanan, dan share page.
@@ -123,12 +123,26 @@ const collectEvidence = async (
 	}
 };
 
+/** Potongan kode + catatan status index (mis. "sedang dibangun") untuk bagian konteks kode. */
+const renderCodeContext = (
+	codeContext: Array<{ file_path: string; start_line: number; end_line: number; content: string }>,
+	codeNotes: string[]
+): string[] => {
+	const lines = codeNotes.map((note) => `- ${note}`);
+	if (codeContext.length === 0 && codeNotes.length === 0) lines.push('(tidak ada potongan kode yang relevan)');
+	for (const chunk of codeContext) {
+		lines.push(`- ${chunk.file_path}:${chunk.start_line}-${chunk.end_line}`, '  ```', ...chunk.content.slice(0, 1200).split('\n').map((l) => `  ${l}`), '  ```');
+	}
+	return lines;
+};
+
 export const buildInvestigationContext = (
 	session: Entity.IQaRecordingSession,
 	events: IAiInputEvent[],
 	signals: FailureSignal[],
 	evidence: LogEvidence[],
-	codeContext: Array<{ file_path: string; start_line: number; end_line: number; content: string }>
+	codeContext: Array<{ file_path: string; start_line: number; end_line: number; content: string }>,
+	codeNotes: string[] = []
 ): string => {
 	const lines: string[] = [
 		'## Sesi',
@@ -159,11 +173,7 @@ export const buildInvestigationContext = (
 		});
 	}
 
-	lines.push('', '## Konteks kode (codebase memory)');
-	if (codeContext.length === 0) lines.push('(tidak ada potongan kode yang relevan)');
-	for (const chunk of codeContext) {
-		lines.push(`- ${chunk.file_path}:${chunk.start_line}-${chunk.end_line}`, '  ```', ...chunk.content.slice(0, 1200).split('\n').map((l) => `  ${l}`), '  ```');
-	}
+	lines.push('', '## Konteks kode (codebase memory)', ...renderCodeContext(codeContext, codeNotes));
 	return lines.join('\n');
 };
 
@@ -185,7 +195,7 @@ export const runInvestigation = async (
 ): Promise<string> => {
 	const grafana = deps.grafana ?? grafanaService;
 	const listPrograms = deps.listPrograms ?? listProgramsForProject;
-	const findCodeContext = deps.findCodeContext ?? findMatchingCodeContext;
+	const findCodeContext = deps.findCodeContext ?? getProjectCodeContext;
 	const completer = deps.completer ?? createOpenAiCompleter();
 
 	const signals = prioritizeSignals(collectFailureSignals(events));
@@ -204,9 +214,9 @@ export const runInvestigation = async (
 		...signals.map((signal) => signal.summary),
 		...evidence.flatMap((item) => item.snippets.flat()).slice(0, 3)
 	].filter(Boolean);
-	const codeContext = session.id_project ? await findCodeContext(Number(session.id_project), searchTerms) : [];
+	const code: IProjectCodeContext = session.id_project ? await findCodeContext(Number(session.id_project), searchTerms) : { chunks: [], notes: [] };
 
-	const context = buildInvestigationContext(session, events, signals, evidence, codeContext);
+	const context = buildInvestigationContext(session, events, signals, evidence, code.chunks, code.notes);
 	const report = (await completer.complete({ system: buildSystemPrompt('investigation'), user: context })).trim();
 	if (!report) throw new Error('Provider AI mengembalikan laporan investigasi kosong.');
 	return `${report}${renderEvidenceAppendix(evidence)}`;

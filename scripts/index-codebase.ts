@@ -5,50 +5,44 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { syncCodebaseUseCase } from '../src/app/http/codebase-memory/use-case/sync-codebase.use-case';
 import postgresConnection from '../src/libs/config/postgresConnection';
 
+/**
+ * Sync manual codebase memory sebuah project (menunggu sampai selesai).
+ *   pnpm index:codebase --project=1                      # semua repo project dari GitHub
+ *   pnpm index:codebase --project=1 --repo=owner/repo --branch=dev
+ *   pnpm index:codebase --project=1 --dir=../app --repo=owner/repo   # salinan lokal
+ *   tambahkan --force untuk re-index semua file
+ */
 async function main() {
 	console.log('=== Knitto Codebase AST & Vector Memory Indexer ===\n');
 
 	const args = process.argv.slice(2);
-	const getArg = (flag: string, fallback: string): string => {
-		const found = args.find((a) => a.startsWith(`${flag}=`));
-		return found ? found.split('=')[1] : fallback;
-	};
+	const getArg = (flag: string): string | undefined => args.find((a) => a.startsWith(`${flag}=`))?.split('=')[1];
 
-	const projectId = Number(getArg('--project', '1'));
-	const baseDir = getArg('--dir', path.resolve(__dirname, '..'));
-	const repoUrl = getArg('--repo', '');
+	const projectId = Number(getArg('--project') ?? '1');
+	const baseDir = getArg('--dir');
 	const force = args.includes('--force');
-
-	console.log(`📌 Target Project ID : ${projectId}`);
-	if (repoUrl) {
-		console.log(`🌐 Source Mode       : GitHub (${repoUrl})`);
-	} else {
-		console.log(`📂 Source Directory  : ${baseDir}`);
-	}
-	console.log(`🔄 Force Reindex     : ${force}\n`);
-	console.log('⏳ Memulai pemindaian, ekstraksi AST, dan embedding ke PostgreSQL pgvector...');
 
 	try {
 		const result = await syncCodebaseUseCase({
 			id_project: projectId,
-			source_type: repoUrl ? 'github' : 'local',
-			base_dir: repoUrl ? undefined : baseDir,
-			repo_url: repoUrl || undefined,
-			force_reindex: force
+			repo_url: getArg('--repo'),
+			branch: getArg('--branch'),
+			base_dir: baseDir ? path.resolve(baseDir) : undefined,
+			force_reindex: force,
+			wait: true,
+			trusted: true
 		});
 
-		console.log('\n✅ Sinkronisasi Codebase Memory Berhasil!');
-		console.log('--------------------------------------------------');
-		console.log(`Project          : ${result.project_name} (ID: ${projectId})`);
-		console.log(`Files Scanned    : ${result.files_scanned}`);
-		console.log(`Files Indexed    : ${result.files_indexed}`);
-		console.log(`Files Skipped    : ${result.files_skipped} (Unchanged cache)`);
-		console.log(`Chunks Indexed   : ${result.chunks_indexed}`);
-		console.log(`Execution Time   : ${(result.duration_ms / 1000).toFixed(2)}s`);
-		console.log('--------------------------------------------------\n');
-
+		console.log(`Project: ${result.project_name} (ID: ${projectId})\n`);
+		let failed = false;
+		for (const repo of result.repos) {
+			const stats = repo.stats ?? repo.local_stats;
+			const detail = stats ? ` — ${stats.files_indexed} file di-index, ${stats.files_skipped} tidak berubah, ${stats.chunks_indexed} chunk` : '';
+			console.log(`${repo.status === 'failed' ? '❌' : '✅'} ${repo.repo_key}@${repo.branch || '?'}: ${repo.status}${repo.sha ? ` @${repo.sha.slice(0, 7)}` : ''}${detail}${repo.error ? `\n   ${repo.error}` : ''}`);
+			failed = failed || repo.status === 'failed';
+		}
 		await postgresConnection.end();
-		process.exit(0);
+		process.exit(failed ? 1 : 0);
 	} catch (err: unknown) {
 		console.error('\n❌ Gagal melakukan indexing codebase:', (err as Error).message);
 		await postgresConnection.end();
