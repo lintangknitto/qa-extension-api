@@ -8,6 +8,7 @@ declare namespace Entity {
 		description?: string | null
 		base_url?: string | null
 		repo_url?: string | null
+		repo_branch?: string | null
 		is_active?: boolean | number
 		created_by_user_id?: number | null
 		created_at?: string
@@ -28,6 +29,7 @@ declare namespace Entity {
 			grafana_dashboard_url?: string | null
 			base_url?: string | null
 			repo_url?: string | null
+			repo_branch?: string | null
 		}>
 		name?: string
 		code?: string
@@ -218,11 +220,27 @@ declare namespace Entity {
 		updated_at?: string
 	}
 
+	interface IQaCodebaseRepo {
+		id_repo: number
+		repo_key: string
+		repo_url: string
+		branch: string
+		last_indexed_sha: string | null
+		status: 'idle' | 'syncing' | 'failed'
+		last_error: string | null
+		sync_started_at: string | Date | null
+		last_synced_at: string | Date | null
+		last_checked_at: string | Date | null
+		created_at?: string
+		updated_at?: string
+	}
+
 	interface IQaCodebaseFile {
 		id_file?: number
-		id_project?: number
+		id_repo?: number
 		file_path?: string
 		file_hash?: string
+		git_blob_sha?: string | null
 		language?: string
 		total_lines?: number
 		ast_summary?: Record<string, unknown> | string
@@ -233,7 +251,7 @@ declare namespace Entity {
 	interface IQaCodebaseSymbol {
 		id_symbol?: number
 		id_file?: number
-		id_project?: number
+		id_repo?: number
 		name?: string
 		kind?: string
 		signature?: string | null
@@ -248,7 +266,7 @@ declare namespace Entity {
 	interface IQaCodebaseChunk {
 		id_chunk?: number
 		id_file?: number
-		id_project?: number
+		id_repo?: number
 		chunk_type?: string
 		content?: string
 		start_line?: number

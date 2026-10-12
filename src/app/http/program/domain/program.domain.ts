@@ -40,7 +40,9 @@ export const canManageSpecificProgram = (
 	if (['SUPERADMIN', 'ADMIN'].includes(norm)) return true;
 	if (
 		norm === 'QA' &&
-		typeof userId === 'number' &&
+		// id_user BIGINT tiba sebagai string dari JWT: bandingkan sebagai angka, jangan cek typeof.
+		userId !== undefined &&
+		userId !== null &&
 		program.created_by_user_id !== undefined &&
 		program.created_by_user_id !== null &&
 		Number(program.created_by_user_id) === Number(userId)
@@ -100,6 +102,7 @@ export const toProgramResponse = (program: Entity.IQaProgram & { project_count?:
 	description: program.description ?? null,
 	base_url: program.base_url ?? null,
 	repo_url: program.repo_url ?? null,
+	repo_branch: program.repo_branch ?? null,
 	project_count: program.project_count !== undefined ? Number(program.project_count) : undefined,
 	is_active: program.is_active === 1 || program.is_active === true,
 	created_by_user_id: program.created_by_user_id ? Number(program.created_by_user_id) : null,

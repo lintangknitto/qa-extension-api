@@ -5,6 +5,7 @@ import { dump } from '@knittotextile/knitto-core-backend';
 import httpServer from '@http/index';
 
 import postgresConnection from './libs/config/postgresConnection';
+import { startAutoIndexJob } from './app/http/codebase-memory/services/auto-index.service';
 import { APP_SECRET_KEY, RECORDING_FEATURE_ENABLED } from './libs/config';
 import {
 	assertRecordingInfraConfigured,
@@ -28,6 +29,9 @@ import {
 
 			// start application
 			await httpServer();
+
+			// Auto-index codebase memory: cek SHA commit repo program/project secara berkala.
+			startAutoIndexJob();
 		} catch (error) {
 			dump(error);
 			process.exit(1);

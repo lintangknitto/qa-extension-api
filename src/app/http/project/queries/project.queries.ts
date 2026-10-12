@@ -69,7 +69,8 @@ const PROJECT_SELECT_FIELDS = `
 					'type', prg_m.type,
 					'grafana_dashboard_url', prg_m.grafana_dashboard_url,
 					'base_url', prg_m.base_url,
-					'repo_url', prg_m.repo_url
+					'repo_url', prg_m.repo_url,
+					'repo_branch', prg_m.repo_branch
 				) ORDER BY prg_m.name ASC
 			)
 			FROM project_programs pp_m

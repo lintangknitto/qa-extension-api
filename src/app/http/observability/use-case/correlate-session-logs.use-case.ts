@@ -2,8 +2,7 @@ import { findSessionById } from '@/app/http/session/queries/session.queries';
 import { assertSessionExists, assertCanAccessSession } from '@/app/http/session/domain/session.domain';
 import { listEventsBySession } from '@/app/http/recording/queries/recording-event.queries';
 import grafanaService, { ILokiLogEntry } from '../services/grafana.service';
-import { searchCodebaseChunksByVector } from '@/app/http/codebase-memory/queries/codebase.queries';
-import embeddingService from '@/libs/services/embedding.service';
+import { getProjectCodeContext } from '@/app/http/codebase-memory/use-case/project-code-context.use-case';
 
 export interface ICorrelateSessionResult {
 	session: {
@@ -104,29 +103,7 @@ const extractErrorsFromEvents = (
 	return { recordingErrors, searchKeywords };
 };
 
-export const findMatchingCodeContext = async (
-	idProject: number,
-	keywords: string[]
-): Promise<ICorrelateSessionResult['matched_code_context']> => {
-	if (keywords.length === 0) return [];
-
-	const combinedQuery = keywords.slice(0, 3).join(' ');
-	try {
-		const queryVector = await embeddingService.generateEmbedding(combinedQuery);
-		const vectorStr = embeddingService.formatVectorForPg(queryVector);
-		const chunks = await searchCodebaseChunksByVector(idProject, vectorStr, 3, 0.3);
-
-		return chunks.map((chunk) => ({
-			file_path: chunk.file_path,
-			start_line: chunk.start_line,
-			end_line: chunk.end_line,
-			similarity: Number(chunk.similarity.toFixed(4)),
-			content: chunk.content
-		}));
-	} catch {
-		return [];
-	}
-};
+export { findMatchingCodeContext } from '@/app/http/codebase-memory/use-case/project-code-context.use-case';
 
 const resolveSessionTimeRange = (
 	session: Entity.IQaRecordingSession
@@ -180,7 +157,7 @@ export const correlateSessionLogsUseCase = async (
 	].filter(Boolean);
 
 	const matchedCodeContext = session.id_project
-		? await findMatchingCodeContext(Number(session.id_project), searchTerms)
+		? (await getProjectCodeContext(Number(session.id_project), searchTerms)).chunks
 		: [];
 
 	return {

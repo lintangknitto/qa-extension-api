@@ -8,6 +8,7 @@ import {
 import { syncCodebaseUseCase } from './use-case/sync-codebase.use-case';
 import { searchCodebaseUseCase } from './use-case/search-codebase.use-case';
 import { listSymbolsUseCase } from './use-case/list-symbols.use-case';
+import { codebaseStatusUseCase } from './use-case/codebase-status.use-case';
 
 const sync: TRequestFunction = async (req) => {
 	const params = req.params as unknown as TProjectParamValidation;
@@ -19,7 +20,8 @@ const sync: TRequestFunction = async (req) => {
 		userLevel: req.userData?.level,
 		...body
 	});
-	return { result, statusCode: 200 };
+	// Sync GitHub berjalan di background: `completed: false`, pantau lewat GET .../codebase/status.
+	return { result };
 };
 
 const search: TRequestFunction = async (req) => {
@@ -50,8 +52,15 @@ const listSymbols: TRequestFunction = async (req) => {
 	return { result };
 };
 
+const status: TRequestFunction = async (req) => {
+	const params = req.params as unknown as TProjectParamValidation;
+	const result = await codebaseStatusUseCase({ idProject: params.id_project, userId: req.userId, userLevel: req.userData?.level });
+	return { result };
+};
+
 export default {
 	sync,
+	status,
 	search,
 	listSymbols
 };

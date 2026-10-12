@@ -50,6 +50,10 @@ const createProgramValidation = object({
 	repo_url: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Repo URL (GitHub)')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Repo URL (GitHub)', 500)))
 	),
+	// Kosong = default branch repo.
+	repo_branch: optional(
+		pipe(string(ERROR_VALIDATION_MSG.string('Branch repo')), maxLength(255, ERROR_VALIDATION_MSG.maxLength('Branch repo', 255)))
+	),
 	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif')))
 });
 export type TCreateProgramValidation = InferOutput<typeof createProgramValidation>;
@@ -78,6 +82,10 @@ const updateProgramValidation = object({
 	),
 	repo_url: optional(
 		pipe(string(ERROR_VALIDATION_MSG.string('Repo URL (GitHub)')), maxLength(500, ERROR_VALIDATION_MSG.maxLength('Repo URL (GitHub)', 500)))
+	),
+	// Kosong = default branch repo.
+	repo_branch: optional(
+		pipe(string(ERROR_VALIDATION_MSG.string('Branch repo')), maxLength(255, ERROR_VALIDATION_MSG.maxLength('Branch repo', 255)))
 	),
 	is_active: optional(boolean(ERROR_VALIDATION_MSG.boolean('Status aktif')))
 });

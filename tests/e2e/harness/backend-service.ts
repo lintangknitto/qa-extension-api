@@ -40,6 +40,9 @@ export const startBackendService = async (
 		OPENAI_API_KEY: 'e2e-fake-mock-key',
 		OPENAI_MODEL: 'mock-gpt-4o',
 		PROJECT_ADMIN_LEVELS: 'ADMIN,QA,SUPERADMIN',
+		// Auto-index codebase tidak boleh memanggil GitHub sungguhan di E2E; spec yang butuh mengaktifkan lewat extraEnv.
+		CODEBASE_AUTO_SYNC_INTERVAL_MINUTES: '0',
+		GITHUB_TOKEN: '',
 		...options.extraEnv
 	};
 

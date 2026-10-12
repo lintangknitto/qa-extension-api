@@ -139,3 +139,13 @@ describe('project.domain', () => {
 		});
 	});
 });
+
+describe('canManageSpecificProject — userId dari JWT (BIGINT sebagai string)', () => {
+	it('QA pembuat project dikenali walau userId string; QA lain tetap ditolak', () => {
+		const project = { id_project: 1, created_by_user_id: '7' } as unknown as Entity.IQaProject;
+		expect(domain.canManageSpecificProject('QA', '7' as unknown as number, project)).toBe(true);
+		expect(domain.canManageSpecificProject('QA', 7, project)).toBe(true);
+		expect(domain.canManageSpecificProject('QA', '8' as unknown as number, project)).toBe(false);
+		expect(domain.canManageSpecificProject('QA', undefined, project)).toBe(false);
+	});
+});

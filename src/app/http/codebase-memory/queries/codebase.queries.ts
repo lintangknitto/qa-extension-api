@@ -3,7 +3,7 @@ import postgresConnection from '@/libs/config/postgresConnection';
 export interface ISimilarChunkResult {
 	id_chunk: number;
 	id_file: number;
-	id_project: number;
+	id_repo: number;
 	file_path: string;
 	chunk_type: string;
 	content: string;
@@ -14,33 +14,33 @@ export interface ISimilarChunkResult {
 }
 
 export const findCodebaseFileByPath = async (
-	idProject: number,
+	idRepo: number,
 	filePath: string
 ): Promise<Entity.IQaCodebaseFile | null> => {
 	const rows = await postgresConnection.raw<Entity.IQaCodebaseFile[]>(
-		'SELECT * FROM codebase_files WHERE id_project = $1 AND file_path = $2 LIMIT 1',
-		[idProject, filePath]
+		'SELECT * FROM codebase_files WHERE id_repo = $1 AND file_path = $2 LIMIT 1',
+		[idRepo, filePath]
 	);
 	return rows[0] ?? null;
 };
 
 export const listCodebaseFiles = async (
-	idProject: number
+	idRepo: number
 ): Promise<Entity.IQaCodebaseFile[]> => {
 	return postgresConnection.raw<Entity.IQaCodebaseFile[]>(
-		'SELECT id_file, id_project, file_path, file_hash, language, total_lines, updated_at FROM codebase_files WHERE id_project = $1 ORDER BY file_path ASC',
-		[idProject]
+		'SELECT id_file, id_repo, file_path, file_hash, language, total_lines, updated_at FROM codebase_files WHERE id_repo = $1 ORDER BY file_path ASC',
+		[idRepo]
 	);
 };
 
 export const searchCodebaseSymbols = async (
-	idProject: number,
+	idRepos: number[],
 	search?: string,
 	kind?: string,
 	limit = 50
 ): Promise<Entity.IQaCodebaseSymbol[]> => {
-	const conditions: string[] = ['s.id_project = $1'];
-	const params: (string | number)[] = [idProject];
+	const conditions: string[] = ['s.id_repo = ANY($1)'];
+	const params: (string | number | number[])[] = [idRepos];
 
 	if (search && search.trim()) {
 		params.push(`%${search.trim()}%`);
@@ -66,7 +66,7 @@ export const searchCodebaseSymbols = async (
 };
 
 export const searchCodebaseChunksByVector = async (
-	idProject: number,
+	idRepos: number[],
 	vectorStr: string,
 	limit = 10,
 	similarityThreshold = 0.3
@@ -75,7 +75,7 @@ export const searchCodebaseChunksByVector = async (
 		SELECT 
 			c.id_chunk,
 			c.id_file,
-			c.id_project,
+			c.id_repo,
 			f.file_path,
 			c.chunk_type,
 			c.content,
@@ -85,7 +85,7 @@ export const searchCodebaseChunksByVector = async (
 			(1 - (c.embedding <=> $1::vector)) AS similarity
 		FROM codebase_chunks c
 		JOIN codebase_files f ON f.id_file = c.id_file
-		WHERE c.id_project = $2
+		WHERE c.id_repo = ANY($2)
 		  AND (c.embedding <=> $1::vector) <= (1 - $3)
 		ORDER BY (c.embedding <=> $1::vector) ASC
 		LIMIT $4
@@ -93,7 +93,7 @@ export const searchCodebaseChunksByVector = async (
 
 	const rows = await postgresConnection.raw<ISimilarChunkResult[]>(query, [
 		vectorStr,
-		idProject,
+		idRepos,
 		similarityThreshold,
 		limit
 	]);
@@ -102,7 +102,7 @@ export const searchCodebaseChunksByVector = async (
 		...r,
 		id_chunk: Number(r.id_chunk),
 		id_file: Number(r.id_file),
-		id_project: Number(r.id_project),
+		id_repo: Number(r.id_repo),
 		start_line: Number(r.start_line),
 		end_line: Number(r.end_line),
 		similarity: Number(r.similarity)

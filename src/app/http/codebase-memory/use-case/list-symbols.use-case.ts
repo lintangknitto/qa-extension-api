@@ -2,6 +2,7 @@ import { findProjectById } from '@/app/http/project/queries/project.queries';
 import { assertProjectExists, assertCanManageSpecificProject } from '@/app/http/project/domain/project.domain';
 import { searchCodebaseSymbols } from '../queries/codebase.queries';
 import type { TListSymbolsQueryValidation } from '../codebase.request';
+import { indexedRepoIds, listProjectRepos } from '../services/project-repos.service';
 
 export const listSymbolsUseCase = async (
 	data: TListSymbolsQueryValidation & { id_project: number; userId: number; userLevel?: string }
@@ -15,7 +16,7 @@ export const listSymbolsUseCase = async (
 	assertCanManageSpecificProject(data.userLevel, data.userId, project);
 
 	const limit = data.limit ?? 50;
-	const symbols = await searchCodebaseSymbols(data.id_project, data.search, data.kind, limit);
+	const symbols = await searchCodebaseSymbols(indexedRepoIds(await listProjectRepos(project)), data.search, data.kind, limit);
 
 	return {
 		project_id: data.id_project,

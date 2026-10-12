@@ -4,6 +4,8 @@ import * as queries from '../../queries/project.queries';
 import * as repo from '../../repo/project.repo';
 import { NotAuthorizationException } from '@knittotextile/knitto-core-backend/dist/CoreException';
 
+// Pemicu auto-index (GitHub + DB) tidak boleh jalan di unit test.
+jest.mock('@/app/http/codebase-memory/services/auto-index.service');
 jest.mock('../../queries/project.queries');
 jest.mock('../../repo/project.repo');
 

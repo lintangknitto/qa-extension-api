@@ -4,12 +4,16 @@ import * as recordingEventQueries from '@/app/http/recording/queries/recording-e
 import grafanaService from '../services/grafana.service';
 import * as codebaseQueries from '@/app/http/codebase-memory/queries/codebase.queries';
 import embeddingService from '@/libs/services/embedding.service';
+import * as projectQueries from '@/app/http/project/queries/project.queries';
+import * as repoQueries from '@/app/http/codebase-memory/queries/codebase-repo.queries';
 
 jest.mock('@/app/http/session/queries/session.queries');
 jest.mock('@/app/http/recording/queries/recording-event.queries');
 jest.mock('../services/grafana.service');
 jest.mock('@/app/http/codebase-memory/queries/codebase.queries');
 jest.mock('@/libs/services/embedding.service');
+jest.mock('@/app/http/project/queries/project.queries');
+jest.mock('@/app/http/codebase-memory/queries/codebase-repo.queries');
 
 describe('CorrelateSessionLogsUseCase', () => {
 	afterEach(() => {
@@ -46,6 +50,9 @@ describe('CorrelateSessionLogsUseCase', () => {
 			}
 		]);
 
+		jest.spyOn(projectQueries, 'findProjectById').mockResolvedValue({ id_project: 1, repo_url: 'knittotextile/knitto-order' });
+		jest.spyOn(repoQueries, 'findRepoForTarget').mockResolvedValue({ id_repo: 4, status: 'idle', last_synced_at: '2026-09-30T09:00:00Z' } as Entity.IQaCodebaseRepo);
+
 		jest.spyOn(embeddingService, 'generateEmbedding').mockResolvedValue([0.1, 0.2]);
 		jest.spyOn(embeddingService, 'formatVectorForPg').mockReturnValue('[0.1,0.2]');
 
@@ -53,7 +60,7 @@ describe('CorrelateSessionLogsUseCase', () => {
 			{
 				id_chunk: 22,
 				id_file: 5,
-				id_project: 1,
+				id_repo: 4,
 				file_path: 'src/order/order.controller.ts',
 				chunk_type: 'symbol',
 				content: 'export class OrderController { createOrder() {} }',

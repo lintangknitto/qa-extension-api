@@ -8,12 +8,13 @@ export const insertProgram = async (fields: {
 	description?: string | null;
 	baseUrl?: string | null;
 	repoUrl?: string | null;
+	repoBranch?: string | null;
 	isActive: boolean;
 	createdByUserId?: number | null;
 }): Promise<number> => {
 	const [row] = await postgresConnection.raw<Array<{ id_program: number | string }>>(
-		`INSERT INTO programs (name, code, type, grafana_dashboard_url, description, base_url, repo_url, is_active, created_by_user_id, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`INSERT INTO programs (name, code, type, grafana_dashboard_url, description, base_url, repo_url, repo_branch, is_active, created_by_user_id, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		 RETURNING id_program`,
 		[
 			fields.name,
@@ -23,6 +24,7 @@ export const insertProgram = async (fields: {
 			fields.description ?? null,
 			fields.baseUrl ?? null,
 			fields.repoUrl ?? null,
+			fields.repoBranch ?? null,
 			Boolean(fields.isActive),
 			fields.createdByUserId ?? null
 		]
@@ -40,6 +42,7 @@ export const updateProgram = async (
 		description?: string | null;
 		baseUrl?: string | null;
 		repoUrl?: string | null;
+		repoBranch?: string | null;
 		isActive?: boolean;
 	}
 ): Promise<void> => {
@@ -73,6 +76,10 @@ export const updateProgram = async (
 	if (fields.repoUrl !== undefined) {
 		params.push(fields.repoUrl);
 		assignments.push(`repo_url = $${params.length}`);
+	}
+	if (fields.repoBranch !== undefined) {
+		params.push(fields.repoBranch);
+		assignments.push(`repo_branch = $${params.length}`);
 	}
 	if (fields.isActive !== undefined) {
 		params.push(Boolean(fields.isActive));
