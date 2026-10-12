@@ -42,6 +42,31 @@ describe('createCheckpointUseCase (G6)', () => {
 		expect(artifactQueries.findArtifactById).not.toHaveBeenCalled();
 	});
 
+	it('menyimpan target checkpoint: teks dirapikan & dipotong 200, URL tanpa token', async () => {
+		await createCheckpointUseCase({
+			userId: OWNER,
+			userLevel: 'IMPLEMENTOR',
+			idSession: 1,
+			input: {
+				note: 'toast muncul',
+				target_locators: ["getByRole('status')"],
+				target_text: `  Data   berhasil\n disimpan ${'x'.repeat(300)}`,
+				page_url: 'https://app.test/chat/12?token=rahasia123',
+				tab_id: 4
+			}
+		});
+		const fields = (sessionRepo.insertCheckpoint as jest.Mock).mock.calls[0][0];
+		expect(fields).toMatchObject({ targetLocators: ["getByRole('status')"], tabId: 4 });
+		expect(fields.targetText.startsWith('Data berhasil disimpan x')).toBe(true);
+		expect(fields.targetText).toHaveLength(200);
+		expect(fields.pageUrl).not.toContain('rahasia123');
+	});
+
+	it('checkpoint lama tanpa target tetap valid (kolom baru null)', async () => {
+		await createCheckpointUseCase({ userId: OWNER, userLevel: 'IMPLEMENTOR', idSession: 1, input: { note: 'cek' } });
+		expect((sessionRepo.insertCheckpoint as jest.Mock).mock.calls[0][0]).toMatchObject({ targetLocators: null, targetText: null, pageUrl: null, tabId: null });
+	});
+
 	it('menerima artifact yang memang milik session', async () => {
 		await expect(
 			createCheckpointUseCase({
@@ -79,5 +104,37 @@ describe('createCheckpointUseCase (G6)', () => {
 				input: { note: 'cek', id_artifact: 123 }
 			})
 		).rejects.toThrow(NotFoundException);
+	});
+
+	it('meredaksi target_text dan target_locators (email/token tidak tersimpan)', async () => {
+		await createCheckpointUseCase({
+			userId: OWNER,
+			userLevel: 'IMPLEMENTOR',
+			idSession: 1,
+			input: {
+				note: 'cek user',
+				target_locators: ["getByText('budi@contoh.test')"],
+				target_text: 'Login sebagai budi@contoh.test'
+			}
+		});
+		const fields = (sessionRepo.insertCheckpoint as jest.Mock).mock.calls[0][0];
+		expect(fields.targetText).toBe('Login sebagai [REDACTED]');
+		expect(fields.targetLocators).toEqual(["getByText('[REDACTED]')"]);
+	});
+
+	it('membuang locator bukan rantai locator Playwright dan page_url bukan http(s) (anti injeksi kode)', async () => {
+		await createCheckpointUseCase({
+			userId: OWNER,
+			userLevel: 'IMPLEMENTOR',
+			idSession: 1,
+			input: {
+				note: 'cek',
+				target_locators: ["locator('x'); require('child_process').execSync('calc'); //", "getByRole('status')"],
+				page_url: "x\nawait page.evaluate(()=>1)\n//"
+			}
+		});
+		const fields = (sessionRepo.insertCheckpoint as jest.Mock).mock.calls[0][0];
+		expect(fields.targetLocators).toEqual(["getByRole('status')"]);
+		expect(fields.pageUrl).toBeNull();
 	});
 });

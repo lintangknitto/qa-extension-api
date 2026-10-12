@@ -2,7 +2,7 @@ import { NotFoundException, NotAuthorizationException } from '@knittotextile/kni
 import { createShareUrlUseCase } from '../../use-case/create-share-url.use-case';
 import { getShareContextUseCase } from '../../use-case/get-share-context.use-case';
 import { renderShareHtml } from '../../use-case/render-share-page';
-import { renderRunsSection, renderTabSwitches, RUNS_SCRIPT, type IShareRun } from '../../use-case/render-share-runs';
+import { renderRunsSection, renderStepTimeline, renderTabSwitches, RUNS_SCRIPT, type IShareRun } from '../../use-case/render-share-runs';
 import * as queries from '../../queries/session.queries';
 import * as repo from '../../repo/session.repo';
 import * as runRepo from '../../repo/session-run.repo';
@@ -181,6 +181,58 @@ describe('Share URL & Web Viewer use cases', () => {
 				[1, 'TC-AUTH-01 - Login User Valid - 2026-10-09 10.05 - Run 1.webm'],
 				[2, 'TC-AUTH-01 - Login - 2026-10-09 11.00 - Run 2.webm']
 			]);
+		});
+
+		it('event aksi masuk user_actions (bukan network walau ber-URL) dan scroll/navigasi/keyboard/tab baru masuk step_events', async () => {
+			(queries.findSessionByShareToken as jest.Mock).mockResolvedValue({ ...mockSession, share_token: 'valid-token' });
+			(queries.listCheckpointsBySession as jest.Mock).mockResolvedValue([]);
+			(genQueries.listGenerations as jest.Mock).mockResolvedValue([]);
+			const action = (sequence: number, payload: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+				id_session: 1, sequence, event_type: 'action', url: 'https://knitto.id/chat/1', payload, ...extra
+			});
+			(eventQueries.listEventsBySession as jest.Mock).mockResolvedValue([
+				action(1, { action: 'navigation', url: 'https://knitto.id/chat/1', navigation_type: 'reload' }),
+				action(2, { action: 'scroll', element: null, scroll_x: 0, scroll_y: 800, delta_x: 0, delta_y: 800 }),
+				action(3, { action: 'keydown', key: 'Enter', modifiers: ['Control'], unique_locator: "getByPlaceholder('Pesan')" }),
+				action(4, { action: 'input', unique_locator: "getByLabel('Password')", value: null, value_redacted: true }),
+				{ id_session: 1, sequence: 5, event_type: 'tab', payload: { kind: 'opened', tab_id: 2, opener_tab_id: 1, url: 'https://knitto.id/inv' } }
+			]);
+			const result = await getShareContextUseCase('valid-token');
+			expect(result.network_requests).toHaveLength(0);
+			expect(result.user_actions.map((a) => [a.sequence, a.action_type, a.target_selector ?? null, a.value ?? null])).toEqual([
+				[1, 'navigation', null, null],
+				[2, 'scroll', null, null],
+				[3, 'keydown', "getByPlaceholder('Pesan')", null],
+				[4, 'input', "getByLabel('Password')", null]
+			]);
+			expect(result.step_events.map((s) => [s.sequence, s.kind, s.label])).toEqual([
+				[1, 'navigation', 'Navigasi (muat ulang) ke https://knitto.id/chat/1'],
+				[2, 'scroll', 'Scroll halaman ke (0, 800), Δ (0, 800)'],
+				[3, 'keyboard', "Tombol Control+Enter pada getByPlaceholder('Pesan')"],
+				[5, 'tab', 'Tab baru dibuka dari aksi: https://knitto.id/inv']
+			]);
+		});
+	});
+
+	describe('renderStepTimeline', () => {
+		it('menggabungkan langkah & checkpoint urut sequence, menampilkan target, dan meng-escape semua nilai', () => {
+			const html = renderStepTimeline(
+				[
+					{ note: 'Toast <b>muncul</b>', sequence: 2, target_locators: ["getByRole('status')"], target_text: '<img src=x onerror=alert(1)>', page_url: 'https://a.test/x?q="1"' },
+					{ note: 'Akhir', sequence: null }
+				],
+				[
+					{ sequence: 2, kind: 'scroll', label: 'Scroll halaman ke (0, 800), Δ (0, 800)' },
+					{ sequence: 1, kind: 'navigation', label: 'Navigasi (ketik URL) ke https://a.test/<script>' }
+				]
+			);
+			const order = ['Navigasi (ketik URL)', 'Scroll halaman', 'Toast &lt;b&gt;muncul', 'Akhir'].map((text) => html.indexOf(text));
+			expect(order.every((pos, i) => pos >= 0 && (i === 0 || pos > order[i - 1]))).toBe(true);
+			expect(html).toContain('🎯 elemen getByRole(&#39;status&#39;) berisi');
+			expect(html).not.toContain('<img src=x');
+			expect(html).not.toContain('<script>');
+			expect(html).not.toContain('<b>muncul');
+			expect(renderStepTimeline([], [])).toBe('');
 		});
 	});
 

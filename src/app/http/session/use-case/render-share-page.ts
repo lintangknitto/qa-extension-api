@@ -2,7 +2,8 @@
 import { getShareContextUseCase } from './get-share-context.use-case';
 import { escapeHtml } from '@/libs/helpers/escapeHtml';
 import { buildVideoFileName } from '@/libs/helpers/videoFileName';
-import { renderRunsSection, renderTabSwitches, RUNS_SCRIPT } from './render-share-runs';
+import { renderRunsSection, renderStepTimeline, renderTabSwitches, RUNS_SCRIPT } from './render-share-runs';
+import { describeCheckpointTarget } from '../../recording/domain/step-event';
 
 export const renderShareHtml = async (shareToken: string, hostUrl?: string): Promise<string> => {
 	const data = await getShareContextUseCase(shareToken);
@@ -25,6 +26,7 @@ export const renderShareHtml = async (shareToken: string, hostUrl?: string): Pro
 		})
 	});
 	const tabSwitchesHtml = renderTabSwitches(data.tab_switches);
+	const stepTimelineHtml = renderStepTimeline(data.checkpoints, data.step_events);
 
 	const statusColor =
 		s.result === 'PASS'
@@ -84,7 +86,19 @@ ${
 ${
 	data.checkpoints.length === 0
 		? '_No manual checkpoints recorded._'
-		: data.checkpoints.map((cp, idx) => `${idx + 1}. ${cp.note}`).join('\n')
+		: data.checkpoints
+			.map((cp, idx) => {
+				const target = describeCheckpointTarget(cp);
+				return `${idx + 1}. ${cp.note}${target ? ` — verifikasi: ${target}` : ''}`;
+			})
+			.join('\n')
+}
+
+## 3a. Scroll, Navigasi & Keyboard (${data.step_events.length})
+${
+	data.step_events.length === 0
+		? '_No scroll/navigation/keyboard steps recorded._'
+		: data.step_events.map((step) => `- #${step.sequence}: ${step.label}`).join('\n')
 }
 
 ## 3b. Tab Switches (${data.tab_switches.length})
@@ -635,24 +649,10 @@ ${data.investigation_report || '_Investigation not generated yet._'}
 							<span>Checkpoints Langkah</span>
 						</h2>
 						<span style="font-size: 11px; font-weight: 700; color: var(--text-muted); background: #f1f5f9; padding: 2px 8px; border-radius: 10px;">
-							${data.checkpoints.length} Langkah
+							${data.checkpoints.length} Checkpoint · ${data.step_events.length} Langkah
 						</span>
 					</div>
-					${
-	data.checkpoints.length === 0
-		? '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 16px 0;">Tidak ada checkpoint yang dicatat.</div>'
-		: `<ol class="timeline">
-								${data.checkpoints
-		.map(
-			(cp, idx) => `
-									<li class="timeline-item">
-										<div class="timeline-node">${idx + 1}</div>
-										<div class="timeline-text">${escapeHtml(cp.note || '')}</div>
-									</li>`
-		)
-		.join('')}
-							   </ol>`
-}
+					${stepTimelineHtml || '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 16px 0;">Tidak ada checkpoint yang dicatat.</div>'}
 				</section>
 				${tabSwitchesHtml ? `<section class="card">
 					<div class="card-header">

@@ -103,6 +103,26 @@ describe('ai-input', () => {
 			expect(context).toContain('Input Value: "Pesan uji otomatis"');
 			expect(context).toContain('Tekan Tombol: "Enter"');
 		});
+
+		it('scroll, jenis navigasi, shortcut, tab baru, dan checkpoint ber-target dalam format ringkas', () => {
+			const context = buildAiSessionContext({
+				session: { test_case_no: 'TC-X', title: 'X' },
+				events: [
+					{ type: 'action', sequence: 1, url: 'https://a.test/chat/9', payload: { action: 'navigation', url: 'https://a.test/chat/9', navigation_type: 'same_document' } },
+					{ type: 'action', sequence: 2, payload: { action: 'scroll', element: null, scroll_x: 0, scroll_y: 600, delta_x: 0, delta_y: 600 } },
+					{ type: 'action', sequence: 3, payload: { action: 'keydown', key: 'Enter', modifiers: ['Control'], locators: ["getByPlaceholder('Pesan')"] } },
+					{ type: 'tab', sequence: 4, payload: { kind: 'opened', tab_id: 2, opener_tab_id: 1, url: 'https://a.test/inv' } },
+					{ type: 'tab', sequence: 5, payload: { kind: 'switch', from_tab_id: 1, to_tab_id: 2 } }
+				],
+				checkpoints: [{ sequence: 3, note: 'Pesan terkirim', target_locators: ["getByRole('status')"], target_text: 'Terkirim', page_url: 'https://a.test/chat/9' }]
+			});
+			expect(context).toContain('1. [NAVIGATE] Navigasi (SPA) ke https://a.test/chat/9');
+			expect(context).toContain('2. [SCROLL] Scroll halaman ke (0, 600), Δ (0, 600)');
+			expect(context).toContain('Tekan Tombol: "Control+Enter"');
+			expect(context).toContain('4. [TAB] Tab baru dibuka dari aksi: https://a.test/inv');
+			expect(context).not.toContain('5. ');
+			expect(context).toContain(`- #3 Pesan terkirim [verifikasi: elemen getByRole('status') berisi "Terkirim"; URL https://a.test/chat/9]`);
+		});
 	});
 
 	describe('parseStoredEvent', () => {

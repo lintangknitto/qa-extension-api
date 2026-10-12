@@ -16,7 +16,7 @@ export const loadSessionEvents = async (idSession: number): Promise<{ actionEven
 	const actionEvents = actionRows.map(parseStoredEvent);
 	const bySequence = new Map<number, IAiInputEvent>();
 	for (const event of [...otherRows, ...signalRows].map(parseStoredEvent)) {
-		if (event.type !== 'action') bySequence.set(event.sequence, event);
+		if (event.type !== 'action' && event.type !== 'tab') bySequence.set(event.sequence, event);
 	}
 	const events = [...actionEvents, ...bySequence.values()].sort((a, b) => a.sequence - b.sequence);
 	return { actionEvents, events };

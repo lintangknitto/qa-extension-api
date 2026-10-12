@@ -1771,6 +1771,15 @@ components:
         note: { type: string, minLength: 1, maxLength: 2000 }
         sequence: { type: integer, minimum: 0 }
         id_artifact: { type: integer, minimum: 1 }
+        target_locators:
+          type: array
+          nullable: true
+          maxItems: 10
+          description: Kandidat locator elemen pilihan tester (mode "Pilih elemen"), terbaik dulu.
+          items: { type: string, minLength: 1, maxLength: 500 }
+        target_text: { type: string, nullable: true, maxLength: 200, description: Teks elemen target untuk assertion toContainText. }
+        page_url: { type: string, nullable: true, maxLength: 2000, description: URL halaman saat checkpoint dibuat (assertion toHaveURL). }
+        tab_id: { type: integer, nullable: true, description: Tab tempat checkpoint dibuat. }
     PresignVideoRequest:
       type: object
       required: [size_bytes]

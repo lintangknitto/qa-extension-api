@@ -105,9 +105,26 @@ describe('session.domain', () => {
 				note: 'cek login',
 				sequence: 12,
 				id_artifact: null,
+				target_locators: null,
+				target_text: null,
+				page_url: null,
+				tab_id: null,
 				created_by_user_id: null,
 				created_at: null
 			});
+		});
+
+		it('memetakan target checkpoint (JSONB array atau string JSON lama)', () => {
+			const base = { id_checkpoint: 4, id_session: 1, note: 'toast', target_text: 'Tersimpan', page_url: 'https://a.test/x', tab_id: '12' as unknown as number };
+			expect(domain.toCheckpointResponse({ ...base, target_locators: ["getByRole('status')", "getByText('Tersimpan')"] })).toMatchObject({
+				target_locators: ["getByRole('status')", "getByText('Tersimpan')"],
+				target_text: 'Tersimpan',
+				page_url: 'https://a.test/x',
+				tab_id: 12
+			});
+			expect(domain.toCheckpointResponse({ ...base, target_locators: '["getByRole(\'status\')"]' }).target_locators).toEqual(["getByRole('status')"]);
+			expect(domain.toCheckpointResponse({ ...base, target_locators: 'bukan json' }).target_locators).toBeNull();
+			expect(domain.toCheckpointResponse({ ...base, target_locators: [] }).target_locators).toBeNull();
 		});
 	});
 });

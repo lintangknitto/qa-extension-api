@@ -90,17 +90,26 @@ export const insertCheckpoint = async (fields: {
 	note: string;
 	sequence?: number | null;
 	idArtifact?: number | null;
+	targetLocators?: string[] | null;
+	targetText?: string | null;
+	pageUrl?: string | null;
+	tabId?: number | null;
 	createdByUserId: number;
 }): Promise<number> => {
 	const [row] = await postgresConnection.raw<Array<{ id_checkpoint: number | string }>>(
-		`INSERT INTO recording_checkpoints (id_session, note, sequence, id_artifact, created_by_user_id, created_at)
-		 VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+		`INSERT INTO recording_checkpoints
+			(id_session, note, sequence, id_artifact, target_locators, target_text, page_url, tab_id, created_by_user_id, created_at)
+		 VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, CURRENT_TIMESTAMP)
 		 RETURNING id_checkpoint`,
 		[
 			fields.idSession,
 			fields.note,
 			fields.sequence ?? null,
 			fields.idArtifact ?? null,
+			fields.targetLocators && fields.targetLocators.length > 0 ? JSON.stringify(fields.targetLocators) : null,
+			fields.targetText ?? null,
+			fields.pageUrl ?? null,
+			fields.tabId ?? null,
 			fields.createdByUserId
 		]
 	);

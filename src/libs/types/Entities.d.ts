@@ -187,6 +187,11 @@ declare namespace Entity {
 		note?: string
 		sequence?: number | null
 		id_artifact?: number | null
+		/** JSONB: kandidat locator elemen pilihan tester (terbaik dulu). */
+		target_locators?: string[] | string | null
+		target_text?: string | null
+		page_url?: string | null
+		tab_id?: number | null
 		created_by_user_id?: number
 		created_at?: string
 	}
