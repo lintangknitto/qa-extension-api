@@ -47,7 +47,7 @@ Respons sukses: `{ status, message, result }` dengan `result.items` dan
 Body create: `id_project` (number), `test_case_no` (1-80), `title` (1-255),
 `description` (opsional), `target_url` (opsional).
 Body end: `result` (`PASS|FAIL|BLOCKED`), `actual_result` (opsional).
-Body checkpoint: `note` (1-2000), `sequence` (opsional), `id_artifact` (opsional).
+Body checkpoint: `note` (1-2000), `sequence` (opsional), `id_artifact` (opsional), dan target opsional dari mode "Pilih elemen": `target_locators` (≤ 10 locator), `target_text` (≤ 200), `page_url`, `tab_id`. Codegen mengubah target menjadi assertion `toContainText`/`toBeVisible`/`toHaveURL`.
 
 Catatan: satu user hanya boleh punya satu session berstatus `recording`
 (dijaga pengecekan aplikasi + unique key `uq_qa_session_active_owner`).

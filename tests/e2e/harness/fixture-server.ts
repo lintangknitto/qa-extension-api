@@ -136,6 +136,76 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
   </script>
 </body></html>`;
 
+	// Fixture "coverage" (recording-coverage-and-codegen-gaps): scroll window/container/iframe, SPA ber-ID acak,
+	// shortcut Ctrl+Enter, panah di listbox, klik canvas, dan link yang membuka tab baru.
+	const coverageHtml = `<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8"><title>Coverage Fixture</title>
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  main { padding: 16px; min-height: 2600px; }
+  #chat-list { height: 160px; overflow: auto; border: 1px solid #94a3b8; width: 400px; }
+  #chat-list p { margin: 0; padding: 4px; height: 24px; }
+  #frame-chat { width: 400px; height: 160px; border: 1px solid #94a3b8; }
+  #opsi li[aria-selected="true"] { background: #bfdbfe; }
+</style></head>
+<body><main>
+  <h1 id="judul">Coverage</h1>
+  <nav><a id="buka-chat" href="/coverage/chat/0">Buka chat</a> | <a id="buka-invoice" href="/coverage/invoice/9001" target="_blank">Buka invoice</a></nav>
+  <section id="view-home">
+    <div id="chat-list" data-testid="chat-list">${Array.from({ length: 60 }, (_, i) => `<p>Pesan ${i + 1}</p>`).join('')}</div>
+    <iframe id="frame-chat" title="Live Chat" src="/coverage/frame"></iframe>
+    <label for="pesan">Pesan</label>
+    <textarea id="pesan"></textarea>
+    <ul id="opsi" role="listbox" tabindex="0" aria-label="Opsi kain">
+      <li role="option" aria-selected="true">Cotton</li><li role="option" aria-selected="false">Rayon</li><li role="option" aria-selected="false">Linen</li>
+    </ul>
+    <canvas id="kanvas" width="200" height="100" style="border:1px solid #333"></canvas>
+    <button type="button" id="selesai">Selesai</button>
+  </section>
+  <section id="view-chat" hidden><h2 id="chat-title"></h2></section>
+  <p id="status" role="status"></p>
+</main>
+<script>
+  const status = document.getElementById('status');
+  const render = () => {
+    const chat = location.pathname.match(/^\\/coverage\\/chat\\/(\\d+)$/);
+    document.getElementById('view-home').hidden = Boolean(chat);
+    document.getElementById('view-chat').hidden = !chat;
+    if (chat) document.getElementById('chat-title').textContent = 'Chat ' + chat[1];
+    if (new URLSearchParams(location.search).get('tab') === '2') document.getElementById('judul').textContent = 'Coverage tab 2';
+  };
+  document.getElementById('buka-chat').addEventListener('click', (event) => {
+    event.preventDefault();
+    // ID percakapan berbeda setiap kali: script harus memakai pola URL, bukan URL persis.
+    history.pushState({}, '', '/coverage/chat/' + Math.floor(10000 + Math.random() * 89999));
+    render();
+  });
+  window.addEventListener('popstate', render);
+  document.getElementById('pesan').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) status.textContent = 'Terkirim: ' + event.target.value;
+  });
+  const opsi = document.getElementById('opsi');
+  opsi.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const items = Array.from(opsi.children);
+    const index = items.findIndex((li) => li.getAttribute('aria-selected') === 'true');
+    items.forEach((li) => li.setAttribute('aria-selected', 'false'));
+    const next = items[Math.min(index + 1, items.length - 1)];
+    next.setAttribute('aria-selected', 'true');
+    status.textContent = 'Opsi: ' + next.textContent;
+  });
+  document.getElementById('kanvas').addEventListener('click', () => { status.textContent = 'Kanvas diklik'; });
+  document.getElementById('selesai').addEventListener('click', () => { status.textContent = 'Selesai'; });
+  render();
+</script></body></html>`;
+	const coverageFrameHtml = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Frame</title></head>
+<body style="margin:0;font-family:sans-serif"><div style="height:1500px;padding:8px">Isi live chat panjang</div></body></html>`;
+	const coverageInvoiceHtml = (id: string) => `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Invoice ${id}</title></head>
+<body><h1>Invoice ${id}</h1><button type="button" id="cetak">Cetak</button><p id="cetak-status" role="status"></p>
+<script>document.getElementById('cetak').addEventListener('click', () => { document.getElementById('cetak-status').textContent = 'Dicetak'; });</script>
+</body></html>`;
+
 	let lastUpload: { name: string; type: string; data: string } | null = null;
 	let lastMultiUpload: Array<{ name: string; type: string; data: string }> | null = null;
 	let orderRequestCount = 0;
@@ -153,6 +223,24 @@ export const startFixtureServer = async (): Promise<IFixtureServer> => {
 		if (colorMatch) {
 			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
 			res.end(colorHtml(colorMatch[1] === 'red' ? '#ff0000' : '#0000ff'));
+			return;
+		}
+
+		const pathname = (req.url ?? '').split('?')[0];
+		if (pathname === '/coverage' || /^\/coverage\/chat\/\d+$/.test(pathname)) {
+			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+			res.end(coverageHtml);
+			return;
+		}
+		if (pathname === '/coverage/frame') {
+			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+			res.end(coverageFrameHtml);
+			return;
+		}
+		const invoice = pathname.match(/^\/coverage\/invoice\/(\d+)$/);
+		if (invoice) {
+			res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+			res.end(coverageInvoiceHtml(invoice[1]));
 			return;
 		}
 

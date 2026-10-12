@@ -2,11 +2,14 @@
  * Builder input AI. Menerima data yang SUDAH direduksi (redaction) dan
  * menyusunnya menjadi konteks terstruktur + anomaly list.
  */
+import { describeCheckpointTarget, summarizeStepEvent, type StepEventKind } from './step-event';
 export interface IAiInputEvent {
 	type: string;
 	sequence: number;
 	occurredAt?: string | null;
 	url?: string | null;
+	/** Tab asal event (null untuk data lama): codegen memakainya untuk variabel page per tab. */
+	tabId?: number | null;
 	payload: Record<string, unknown>;
 }
 
@@ -14,6 +17,11 @@ export interface IAiInputCheckpoint {
 	sequence?: number | null;
 	note?: string | null;
 	created_at?: string | null;
+	/** Checkpoint ber-target (mode "Pilih elemen"): JSONB array atau string JSON lama. */
+	target_locators?: unknown;
+	target_text?: string | null;
+	page_url?: string | null;
+	tab_id?: number | null;
 }
 
 export interface IAiSessionInput {
@@ -62,6 +70,7 @@ export const parseStoredEvent = (row: Entity.IQaRecordingEvent): IAiInputEvent =
 	sequence: Number(row.sequence ?? 0),
 	occurredAt: row.occurred_at ?? null,
 	url: row.url ?? null,
+	tabId: row.tab_id === null || row.tab_id === undefined ? null : Number(row.tab_id),
 	payload: parseEventPayload(row.payload)
 });
 
@@ -165,7 +174,13 @@ const formatElementMetadata = (element: Record<string, unknown> | null, labelFal
 	return meta.length > 0 ? [`Elemen: ${meta.join(' ')}`] : [];
 };
 
-const formatActionValues = (actionKind: string, payload: Record<string, unknown>): string[] => {
+/** Kombinasi tombol format Playwright (`Control+Enter`). */
+const keyCombo = (payload: Record<string, unknown>): string => {
+	const modifiers = Array.isArray(payload.modifiers) ? payload.modifiers.filter((m): m is string => typeof m === 'string') : [];
+	return [...modifiers, asString(payload.key) || 'Enter'].join('+');
+};
+
+const formatActionValues =(actionKind: string, payload: Record<string, unknown>): string[] => {
 	const parts: string[] = [];
 	if (actionKind === 'input' || actionKind === 'fill') {
 		if (payload.value_redacted === true) {
@@ -184,8 +199,7 @@ const formatActionValues = (actionKind: string, payload: Record<string, unknown>
 			parts.push(payload.value_redacted === true ? 'Value: [REDACTED/SENSITIF]' : `Value: ${JSON.stringify(payload.value)}`);
 		}
 	} else if (actionKind === 'keydown') {
-		const key = asString(payload.key) || 'Enter';
-		parts.push(`Tekan Tombol: "${key}"`);
+		parts.push(`Tekan Tombol: "${keyCombo(payload)}"`);
 	}
 	return parts;
 };
@@ -217,7 +231,15 @@ const formatActionEvent = (event: IAiInputEvent, stepIndex: number): string => {
 	return `${stepIndex}. [${actionKind.toUpperCase()}]${detailStr}`;
 };
 
+const STEP_TAGS: Record<StepEventKind, string> = { scroll: 'SCROLL', navigation: 'NAVIGATE', keyboard: 'KEYDOWN', tab: 'TAB' };
+
 const formatStepEvent = (event: IAiInputEvent, stepIndex: number): string | null => {
+	// Scroll, navigasi ber-jenis, dan tab baru: format ringkas yang sama dengan timeline share.
+	// Keydown & navigasi rekaman lama tetap memakai format rinci (locator/URL) di bawah.
+	const summary = summarizeStepEvent(event.type, event.payload, event.url);
+	const concise = summary && (summary.kind === 'scroll' || summary.kind === 'tab' || (summary.kind === 'navigation' && asString(event.payload.navigation_type)));
+	if (summary && concise) return `${stepIndex}. [${STEP_TAGS[summary.kind]}] ${summary.label}`;
+
 	if (event.type === 'navigation') {
 		const targetUrl = asString(event.payload.url) || event.url || '';
 		return `${stepIndex}. [NAVIGATE] Buka URL: ${targetUrl || '(tidak ada url)'}`;
@@ -230,9 +252,11 @@ const formatStepEvent = (event: IAiInputEvent, stepIndex: number): string | null
 	return null;
 };
 
+const isStepEvent = (event: IAiInputEvent): boolean =>
+	event.type === 'action' || event.type === 'navigation' || (event.type === 'tab' && event.payload.kind === 'opened');
+
 const renderSteps = (events: IAiInputEvent[]): string => {
-	const stepEvents = events
-		.filter((event) => (event.type === 'action' || event.type === 'navigation') && !isInternalExtensionEvent(event));
+	const stepEvents = events.filter((event) => isStepEvent(event) && !isInternalExtensionEvent(event));
 	if (stepEvents.length === 0) return '(tidak ada action tercatat)';
 	const lines: string[] = [];
 	let stepIndex = 1;
@@ -250,7 +274,10 @@ export const buildAiSessionContext = (input: IAiSessionInput): string => {
 	const checkpointLines =
 		input.checkpoints.length > 0
 			? input.checkpoints
-				.map((cp) => `- ${cp.sequence !== null && cp.sequence !== undefined ? `#${cp.sequence} ` : ''}${cp.note ?? ''}`)
+				.map((cp) => {
+					const target = describeCheckpointTarget(cp);
+					return `- ${cp.sequence !== null && cp.sequence !== undefined ? `#${cp.sequence} ` : ''}${cp.note ?? ''}${target ? ` [verifikasi: ${target}]` : ''}`;
+				})
 				.join('\n')
 			: '(tidak ada checkpoint)';
 

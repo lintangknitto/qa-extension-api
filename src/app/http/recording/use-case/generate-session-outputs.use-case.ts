@@ -69,7 +69,7 @@ export const generateSessionOutputsUseCase = async (ctx: {
 			// AI hanya mengusulkan patch value/komentar; struktur langkah dikunci oleh validator.
 			const raw = await completer.complete({ system: buildSystemPrompt(kind), user: buildPatchUserPrompt(sessionInfo, codegen.steps) });
 			const result = validatePatches(codegen.steps, parsePatchResponse(raw));
-			return renderPatchedScript(sessionInfo, codegen.steps, result);
+			return renderPatchedScript(sessionInfo, codegen.steps, result, codegen);
 		}
 		return normalizeAiOutput(kind, await completer.complete({ system: buildSystemPrompt(kind), user: context }));
 	};

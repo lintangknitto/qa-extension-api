@@ -40,6 +40,7 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 		expect(firstRunOutput).toContain('Applying 002_test_case_templates_v4.sql');
 		expect(firstRunOutput).toContain('Applying 003_recording_session_video_object_key.sql');
 		expect(firstRunOutput).toContain('Applying 004_recording_session_runs.sql');
+		expect(firstRunOutput).toContain('Applying 005_recording_checkpoint_targets.sql');
 		expect(firstRunOutput).toContain('Database migrations are up to date.');
 
 		const pool = new Pool({
@@ -59,7 +60,21 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 				'001_init_schema.sql',
 				'002_test_case_templates_v4.sql',
 				'003_recording_session_video_object_key.sql',
-				'004_recording_session_runs.sql'
+				'004_recording_session_runs.sql',
+				'005_recording_checkpoint_targets.sql'
+			]);
+
+			// Checkpoint ber-target (005): kolom baru nullable, data lama tetap valid.
+			const checkpointColumns = await pool.query<{ column_name: string; data_type: string; is_nullable: string }>(
+				`SELECT column_name, data_type, is_nullable FROM information_schema.columns
+				 WHERE table_name = 'recording_checkpoints' AND column_name IN ('target_locators', 'target_text', 'page_url', 'tab_id')
+				 ORDER BY column_name`
+			);
+			expect(checkpointColumns.rows).toEqual([
+				{ column_name: 'page_url', data_type: 'text', is_nullable: 'YES' },
+				{ column_name: 'tab_id', data_type: 'integer', is_nullable: 'YES' },
+				{ column_name: 'target_locators', data_type: 'jsonb', is_nullable: 'YES' },
+				{ column_name: 'target_text', data_type: 'character varying', is_nullable: 'YES' }
 			]);
 
 			const videoKeyColumn = await pool.query(
@@ -100,16 +115,17 @@ describe('PostgreSQL Migration & Fixtures (Checkpoint 2)', () => {
 			expect(tableNames).toContain('recording_generations');
 			expect(tableNames).toContain('recording_session_runs');
 
-			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 4, seed V4 tidak dobel)
+			// 2. Second run: Idempotency check (tidak ada error, migration count tetap 5, seed V4 tidak dobel)
 			const secondRunOutput = execSync(`pnpm exec tsx "${migrateScriptPath}"`, { env, encoding: 'utf-8' });
 			expect(secondRunOutput).not.toContain('Applying 001_init_schema.sql');
 			expect(secondRunOutput).not.toContain('Applying 002_test_case_templates_v4.sql');
 			expect(secondRunOutput).not.toContain('Applying 003_recording_session_video_object_key.sql');
 			expect(secondRunOutput).not.toContain('Applying 004_recording_session_runs.sql');
+		expect(secondRunOutput).not.toContain('Applying 005_recording_checkpoint_targets.sql');
 			expect(secondRunOutput).toContain('Database migrations are up to date.');
 
 			const migRowsAfter = await pool.query('SELECT COUNT(*) AS total FROM schema_migrations');
-			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(4);
+			expect(parseInt(migRowsAfter.rows[0].total, 10)).toBe(5);
 			const templateCountAfter = await pool.query('SELECT COUNT(*) AS total FROM test_case_templates');
 			expect(parseInt(templateCountAfter.rows[0].total, 10)).toBe(1);
 		} finally {

@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/libs/helpers/escapeHtml';
+import { describeCheckpointTarget } from '../../recording/domain/step-event';
 
 export interface IShareRun {
 	run_number: number;
@@ -75,6 +76,54 @@ export const renderTabSwitches = (switches: IShareTabSwitch[]): string => {
 				</li>`;
 		})
 		.join('')}</ol>`;
+};
+
+export interface IShareTimelineCheckpoint {
+	note: string | null;
+	sequence: number | null;
+	target_locators?: string[] | null;
+	target_text?: string | null;
+	page_url?: string | null;
+}
+
+export interface IShareTimelineStep {
+	sequence: number;
+	kind: string;
+	label: string;
+}
+
+const STEP_ICONS: Record<string, string> = { scroll: '↕', navigation: '→', keyboard: '⌨', tab: '+' };
+
+/**
+ * Timeline gabungan urut sequence: checkpoint (dengan target elemen/URL bila ada) dan langkah penting
+ * (scroll, jenis navigasi, tombol/shortcut, tab baru). Checkpoint tanpa sequence di akhir. Semua nilai di-escape.
+ */
+export const renderStepTimeline = (checkpoints: IShareTimelineCheckpoint[], steps: IShareTimelineStep[]): string => {
+	type Item = { order: number; html: string };
+	const items: Item[] = [];
+	for (const step of steps) {
+		items.push({
+			order: step.sequence,
+			html: `<li class="timeline-item step-item step-${escapeHtml(step.kind)}">
+					<div class="timeline-node">${STEP_ICONS[step.kind] ?? '•'}</div>
+					<div class="timeline-text" style="color: var(--text-muted); font-weight: 400;">${escapeHtml(step.label)}</div>
+				</li>`
+		});
+	}
+	checkpoints.forEach((cp, index) => {
+		const target = describeCheckpointTarget(cp);
+		items.push({
+			order: cp.sequence ?? Number.MAX_SAFE_INTEGER,
+			html: `<li class="timeline-item checkpoint-item">
+					<div class="timeline-node">${index + 1}</div>
+					<div class="timeline-text">${escapeHtml(cp.note || '')}${target ? `<div class="timeline-target" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">🎯 ${escapeHtml(target)}</div>` : ''}</div>
+				</li>`
+		});
+	});
+	if (items.length === 0) return '';
+	// Sort stabil: untuk sequence sama langkah tampil dulu (checkpoint dibuat setelah event bersequence itu).
+	items.sort((a, b) => a.order - b.order);
+	return `<ol class="timeline" aria-label="Timeline langkah">${items.map((item) => item.html).join('')}</ol>`;
 };
 
 /** Download lewat blob: atribut `download` diabaikan untuk URL MinIO beda origin. Gagal fetch → buka link langsung. */

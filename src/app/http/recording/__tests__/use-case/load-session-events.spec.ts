@@ -38,4 +38,14 @@ describe('loadSessionEvents', () => {
 		expect(new Set(sequences).size).toBe(sequences.length);
 		expect(sequences).toHaveLength(2000 + 1 + 2);
 	});
+
+	it('event tab ikut di actionEvents (untuk codegen multi-tab) tanpa duplikat di events', async () => {
+		const tab = { ...row(3, 'tab', { kind: 'opened', tab_id: 2, opener_tab_id: 1 }), tab_id: 2 };
+		(eventQueries.listActionEventsBySession as jest.Mock).mockResolvedValue([row(2, 'action', { action: 'click' }), tab]);
+		(eventQueries.listEventsBySession as jest.Mock).mockResolvedValue([row(1, 'console'), row(2, 'action', { action: 'click' }), tab]);
+		(eventQueries.listFailureSignalEventsBySession as jest.Mock).mockResolvedValue([]);
+		const { actionEvents, events } = await loadSessionEvents(1);
+		expect(actionEvents.map((e) => [e.type, e.tabId ?? null])).toEqual([['action', null], ['tab', 2]]);
+		expect(events.map((e) => e.sequence)).toEqual([1, 2, 3]);
+	});
 });

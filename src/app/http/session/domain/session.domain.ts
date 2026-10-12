@@ -90,13 +90,38 @@ export const toSessionResponse = (session: Entity.IQaRecordingSession) => {
 	};
 };
 
+export const CHECKPOINT_TARGET_TEXT_MAX_LENGTH = 200;
+export const CHECKPOINT_MAX_LOCATORS = 10;
+export const CHECKPOINT_LOCATOR_MAX_LENGTH = 500;
+
+/** Kolom JSONB dikembalikan `pg` sebagai array; string JSON (data lama/driver lain) tetap didukung. */
+export const parseTargetLocators = (value: unknown): string[] | null => {
+	let parsed = value;
+	if (typeof value === 'string') {
+		try {
+			parsed = JSON.parse(value);
+		} catch {
+			return null;
+		}
+	}
+	if (!Array.isArray(parsed)) return null;
+	const locators = parsed.filter((item): item is string => typeof item === 'string' && item.length > 0);
+	return locators.length > 0 ? locators : null;
+};
+
+const toNumberOrNull = (value: unknown): number | null => (value !== undefined && value !== null ? Number(value) : null);
+
 export const toCheckpointResponse = (checkpoint: Entity.IQaRecordingCheckpoint) => ({
-	id_checkpoint: checkpoint.id_checkpoint !== undefined && checkpoint.id_checkpoint !== null ? Number(checkpoint.id_checkpoint) : null,
-	id_session: checkpoint.id_session !== undefined && checkpoint.id_session !== null ? Number(checkpoint.id_session) : null,
+	id_checkpoint: toNumberOrNull(checkpoint.id_checkpoint),
+	id_session: toNumberOrNull(checkpoint.id_session),
 	note: checkpoint.note ?? null,
-	sequence: checkpoint.sequence !== undefined && checkpoint.sequence !== null ? Number(checkpoint.sequence) : null,
-	id_artifact: checkpoint.id_artifact !== undefined && checkpoint.id_artifact !== null ? Number(checkpoint.id_artifact) : null,
-	created_by_user_id: checkpoint.created_by_user_id !== undefined && checkpoint.created_by_user_id !== null ? Number(checkpoint.created_by_user_id) : null,
+	sequence: toNumberOrNull(checkpoint.sequence),
+	id_artifact: toNumberOrNull(checkpoint.id_artifact),
+	target_locators: parseTargetLocators(checkpoint.target_locators),
+	target_text: checkpoint.target_text ?? null,
+	page_url: checkpoint.page_url ?? null,
+	tab_id: toNumberOrNull(checkpoint.tab_id),
+	created_by_user_id: toNumberOrNull(checkpoint.created_by_user_id),
 	created_at: checkpoint.created_at ?? null
 });
 

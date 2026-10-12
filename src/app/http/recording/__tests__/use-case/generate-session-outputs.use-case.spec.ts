@@ -33,6 +33,7 @@ import * as eventQueries from '@/app/http/recording/queries/recording-event.quer
 import * as generationQueries from '@/app/http/recording/queries/generation.queries';
 import * as generationRepo from '@/app/http/recording/repo/generation.repo';
 import { generateSessionOutputsUseCase } from '../../use-case/generate-session-outputs.use-case';
+import { CODEGEN_VERSION } from '../../domain/playwright-codegen';
 
 const OWNER = 7;
 
@@ -77,7 +78,7 @@ describe('generateSessionOutputsUseCase', () => {
 		expect(result.results.playwright.status).toBe('completed');
 		expect(result.results.playwright.output).toContain("await page.getByRole('button', { name: 'Kirim', exact: true }).click();");
 		expect(generationRepo.startGeneration).toHaveBeenCalledWith(
-			expect.objectContaining({ kind: 'playwright', model: 'deterministic-codegen', promptVersion: 'codegen-v1' })
+			expect.objectContaining({ kind: 'playwright', model: 'deterministic-codegen', promptVersion: CODEGEN_VERSION })
 		);
 	});
 

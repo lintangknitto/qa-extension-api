@@ -7,6 +7,7 @@ import { listEventsBySession } from '../../recording/queries/recording-event.que
 import { listGenerations } from '../../recording/queries/generation.queries';
 import { findProjectById } from '../../project/queries/project.queries';
 import { listRunsBySession } from '../repo/session-run.repo';
+import { primaryLocator, summarizeStepEvent, type StepEventKind } from '../../recording/domain/step-event';
 
 export interface INetworkRequestSummary {
 	sequence: number;
@@ -33,6 +34,14 @@ export interface IUserActionSummary {
 	target_selector?: string;
 	value?: string;
 	url?: string;
+	timestamp?: string;
+}
+
+/** Langkah penting untuk timeline share: scroll, jenis navigasi, tombol/shortcut, tab baru. */
+export interface IStepEventItem {
+	sequence: number;
+	kind: StepEventKind;
+	label: string;
 	timestamp?: string;
 }
 
@@ -67,6 +76,7 @@ export const getShareContextUseCase = async (shareToken: string) => {
 	const userActions: IUserActionSummary[] = [];
 	const failedRequests: INetworkRequestSummary[] = [];
 	const tabSwitches: ITabSwitchSummary[] = [];
+	const stepEvents: IStepEventItem[] = [];
 
 	for (const event of rawEvents) {
 		let payload: any = {};
@@ -80,8 +90,24 @@ export const getShareContextUseCase = async (shareToken: string) => {
 
 		const eventType = String(event.event_type || '').toLowerCase();
 		const seq = Number(event.sequence || 0);
+		const timestamp = event.occurred_at || event.created_at;
 
-		// Event `tab` punya `url`: harus dicek sebelum heuristik network di bawah.
+		// Event `action`/`tab` bisa punya `url`: harus dicek sebelum heuristik network di bawah.
+		const step = eventType === 'action' || eventType === 'tab' ? summarizeStepEvent(eventType, payload ?? {}, event.url) : null;
+		if (step) stepEvents.push({ sequence: seq, kind: step.kind, label: step.label, timestamp });
+
+		if (eventType === 'action') {
+			userActions.push({
+				sequence: seq,
+				action_type: String(payload?.action || 'action'),
+				target_selector: primaryLocator(payload ?? {}) || payload?.selector || undefined,
+				value: payload?.value_redacted === true ? undefined : (payload?.value ?? undefined),
+				url: event.url || payload?.url,
+				timestamp
+			});
+			continue;
+		}
+
 		if (eventType === 'tab') {
 			if (payload?.kind === 'switch') {
 				tabSwitches.push({
@@ -157,6 +183,7 @@ export const getShareContextUseCase = async (shareToken: string) => {
 		console_logs: consoleLogs,
 		user_actions: userActions,
 		tab_switches: tabSwitches,
+		step_events: stepEvents,
 		counts: {
 			total_events: rawEvents.length,
 			total_checkpoints: checkpoints.length,

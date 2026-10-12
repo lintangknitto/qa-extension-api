@@ -153,9 +153,11 @@ export const applyPatches = (steps: CodegenStep[], patches: AiPatch[]): CodegenS
 export const renderPatchedScript = (
 	session: CodegenInput['session'],
 	steps: CodegenStep[],
-	result: PatchValidationResult
+	result: PatchValidationResult,
+	base: { leadingComments?: string[]; trailingComments?: string[] } = {}
 ): string => {
 	const header = `Patch AI: ${result.accepted.length} diterapkan, ${result.rejected.length} ditolak`;
 	const rejectedNotes = result.rejected.map((r) => `ditolak: ${r.reason}`);
-	return renderScript(session, applyPatches(steps, result.accepted), [], [header, ...rejectedNotes]);
+	// Ringkasan & komentar penutup script deterministik tetap ikut.
+	return renderScript(session, applyPatches(steps, result.accepted), base.trailingComments ?? [], [header, ...rejectedNotes, ...(base.leadingComments ?? [])]);
 };

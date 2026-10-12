@@ -1,5 +1,6 @@
 import {
 	any,
+	array,
 	boolean,
 	InferOutput,
 	integer,
@@ -18,7 +19,14 @@ import {
 	transform
 } from 'valibot';
 import { ERROR_VALIDATION_MSG } from '@/libs/config/errorMessage';
-import { SESSION_RESULTS, SESSION_TEST_CASE_NO_MAX_LENGTH, SESSION_TITLE_MAX_LENGTH } from './domain/session.domain';
+import {
+	CHECKPOINT_LOCATOR_MAX_LENGTH,
+	CHECKPOINT_MAX_LOCATORS,
+	CHECKPOINT_TARGET_TEXT_MAX_LENGTH,
+	SESSION_RESULTS,
+	SESSION_TEST_CASE_NO_MAX_LENGTH,
+	SESSION_TITLE_MAX_LENGTH
+} from './domain/session.domain';
 
 const ID_MSG = 'ID tidak valid.';
 const DATE_MSG = 'Tanggal harus format YYYY-MM-DD.';
@@ -87,7 +95,33 @@ const createCheckpointValidation = object({
 		maxLength(2000, ERROR_VALIDATION_MSG.maxLength('Catatan checkpoint', 2000))
 	),
 	sequence: optional(pipe(number(ERROR_VALIDATION_MSG.number('Sequence')), integer(ID_MSG), minValue(0, ID_MSG))),
-	id_artifact: optional(pipe(number(ERROR_VALIDATION_MSG.number('ID artifact')), integer(ID_MSG), minValue(1, ID_MSG)))
+	id_artifact: optional(pipe(number(ERROR_VALIDATION_MSG.number('ID artifact')), integer(ID_MSG), minValue(1, ID_MSG))),
+	// Mode "Pilih elemen": kandidat locator elemen (terbaik dulu) dan teksnya. Semua opsional (data lama tetap valid).
+	target_locators: nullish(
+		pipe(
+			array(
+				pipe(
+					string(ERROR_VALIDATION_MSG.string('Locator target')),
+					minLength(1, ERROR_VALIDATION_MSG.minLength('Locator target', 1)),
+					maxLength(CHECKPOINT_LOCATOR_MAX_LENGTH, ERROR_VALIDATION_MSG.maxLength('Locator target', CHECKPOINT_LOCATOR_MAX_LENGTH))
+				)
+			),
+			maxLength(CHECKPOINT_MAX_LOCATORS, `Locator target maksimal ${CHECKPOINT_MAX_LOCATORS}.`)
+		)
+	),
+	target_text: nullish(
+		pipe(
+			string(ERROR_VALIDATION_MSG.string('Teks target')),
+			maxLength(CHECKPOINT_TARGET_TEXT_MAX_LENGTH, ERROR_VALIDATION_MSG.maxLength('Teks target', CHECKPOINT_TARGET_TEXT_MAX_LENGTH))
+		)
+	),
+	page_url: nullish(
+		pipe(
+			string(ERROR_VALIDATION_MSG.string('URL halaman')),
+			maxLength(2000, ERROR_VALIDATION_MSG.maxLength('URL halaman', 2000))
+		)
+	),
+	tab_id: nullish(pipe(number(ERROR_VALIDATION_MSG.number('ID tab')), integer('ID tab tidak valid.')))
 });
 export type TCreateCheckpointValidation = InferOutput<typeof createCheckpointValidation>;
 

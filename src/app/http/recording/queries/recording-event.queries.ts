@@ -42,11 +42,11 @@ export const listFailureSignalEventsBySession = async (idSession: number, limit 
 	);
 
 /**
- * Hanya event aksi tester (klik, input, navigasi) tanpa batas jumlah, supaya
- * event network/console sesi yang ramai tidak memotong langkah tester.
+ * Hanya event aksi tester (klik, input, navigasi) dan event tab (buka/pindah tab) tanpa batas jumlah,
+ * supaya event network/console sesi yang ramai tidak memotong langkah tester.
  */
 export const listActionEventsBySession = async (idSession: number): Promise<Array<Entity.IQaRecordingEvent>> =>
 	postgresConnection.raw<Array<Entity.IQaRecordingEvent>>(
-		"SELECT * FROM recording_events WHERE id_session = $1 AND event_type = 'action' ORDER BY sequence ASC",
+		"SELECT * FROM recording_events WHERE id_session = $1 AND event_type IN ('action', 'tab') ORDER BY sequence ASC",
 		[idSession]
 	);
