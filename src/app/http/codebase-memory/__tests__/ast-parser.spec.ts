@@ -88,4 +88,19 @@ export default router;
 		expect(symbolNames).toContain('createProjectHandler');
 		expect(symbolNames).toContain('IProjectDto');
 	});
+
+	it('middleware/route dengan handler sebagai argumen pertama tidak menjadikan isi fungsi sebagai nama simbol', () => {
+		const body = 'x'.repeat(400);
+		const code = `
+const app = express();
+app.use(async (req, res, next) => { console.log("${body}"); next(); });
+app.get(PATHS.health, (req, res) => res.send("${body}"));
+router.post('/messages', controller.send);
+`;
+		const result = astParserService.parseSource('src/app.ts', code);
+		const routes = result.symbols.filter((s) => s.kind === 'route_handler');
+		expect(routes.map((s) => s.name)).toEqual(['USE *', 'GET PATHS.health', 'POST /messages']);
+		expect(routes.every((s) => s.name.length < 255 && (s.signature ?? '').length < 255)).toBe(true);
+		expect(routes[2].signature).toBe('POST /messages -> controller.send');
+	});
 });
