@@ -115,8 +115,11 @@ export class AstParserService {
 			let routePath = '';
 			if (ts.isStringLiteral(firstArg) || ts.isNoSubstitutionTemplateLiteral(firstArg)) {
 				routePath = firstArg.text;
-			} else {
+			} else if (ts.isIdentifier(firstArg) || ts.isPropertyAccessExpression(firstArg) || ts.isTemplateExpression(firstArg)) {
 				routePath = firstArg.getText(sourceFile);
+			} else {
+				// Mis. `app.use(async (req, res) => {...})`: argumen pertama adalah handler/middleware, bukan path.
+				routePath = '*';
 			}
 
 			const handlerArg = node.arguments[node.arguments.length - 1];
@@ -126,7 +129,7 @@ export class AstParserService {
 				path: routePath,
 				start_line: getLine(node.getStart(sourceFile)),
 				end_line: getLine(node.getEnd()),
-				handler_name: handlerArg ? handlerArg.getText(sourceFile) : undefined
+				handler_name: handlerArg && (ts.isIdentifier(handlerArg) || ts.isPropertyAccessExpression(handlerArg)) ? handlerArg.getText(sourceFile) : undefined
 			};
 		};
 

@@ -13,6 +13,9 @@ export const markCodebaseFileIndexed = async (idFile: number, fileHash: string, 
 	);
 };
 
+/** Kolom VARCHAR: nama simbol hasil AST bisa sangat panjang (mis. template literal/ekspresi). */
+const truncate = (value: string, max: number): string => (value.length > max ? `${value.slice(0, max - 1)}…` : value);
+
 export const upsertCodebaseFile = async (
 	idRepo: number,
 	filePath: string,
@@ -71,13 +74,13 @@ export const insertCodebaseSymbols = async (
 		params.push(
 			idFile,
 			idRepo,
-			sym.name,
-			sym.kind,
+			truncate(sym.name, 255),
+			truncate(sym.kind, 50),
 			sym.signature || null,
 			sym.docstring || null,
 			sym.start_line,
 			sym.end_line,
-			sym.scope_path || null,
+			sym.scope_path ? truncate(sym.scope_path, 255) : null,
 			JSON.stringify(sym.metadata || {})
 		);
 	}
